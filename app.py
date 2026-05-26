@@ -81,6 +81,9 @@ TRANSLATIONS = {
         "notes": "Notes",
         "notes_placeholder": "Why are you watching it?",
         "buy_price": "Buy price",
+        "owned": "Bought",
+        "owned_help": "Check when you actually bought this stock.",
+        "live_pl": "Live P/L",
         "add_watchlist": "Add to watchlist",
         "remove": "Remove",
         "add_symbol": "+",
@@ -200,6 +203,9 @@ TRANSLATIONS = {
         "notes": "הערות",
         "notes_placeholder": "למה אתה עוקב אחריה?",
         "buy_price": "מחיר קנייה",
+        "owned": "קניתי בפועל",
+        "owned_help": "סמן V כאשר קנית את המניה בפועל.",
+        "live_pl": "רווח/הפסד חי",
         "add_watchlist": "הוסף לרשימת מעקב",
         "remove": "הסר",
         "add_symbol": "+",
@@ -1200,14 +1206,15 @@ def render_watchlist(lang: str, settings: AdvisorSettings) -> None:
         )
 
     with st.form("watchlist_form", clear_on_submit=True):
-        col_a, col_price, col_b = st.columns([1, 1, 3])
+        col_a, col_price, col_owned, col_b = st.columns([1, 1, 1, 3])
         ticker = col_a.text_input("Ticker", placeholder="FUTU").upper().strip()
         buy_price = col_price.number_input(tr(lang, "buy_price"), min_value=0.0, value=0.0, step=1.0)
+        owned = col_owned.checkbox(tr(lang, "owned"), help=tr(lang, "owned_help"))
         notes = col_b.text_input(tr(lang, "notes"), placeholder=tr(lang, "notes_placeholder"))
         submitted = st.form_submit_button(tr(lang, "add_watchlist"))
 
     if submitted and ticker:
-        add_to_watchlist(ticker, notes, lang, buy_price=buy_price)
+        add_to_watchlist(ticker, notes, lang, buy_price=buy_price, owned=owned)
 
     if not st.session_state.watchlist:
         st.info(tr(lang, "empty_watchlist"))
@@ -1217,8 +1224,19 @@ def render_watchlist(lang: str, settings: AdvisorSettings) -> None:
 
     for index, row in enumerate(list(st.session_state.watchlist)):
         quote = fetch_watchlist_quote(row["Ticker"])
-        col_ticker, col_price, col_change, col_buy, col_notes, col_added, col_remove = st.columns([1, 1.1, 1.1, 1.1, 2.5, 1.4, 0.5])
+        col_ticker, col_owned, col_price, col_change, col_pl, col_buy, col_notes, col_added, col_remove = st.columns([1, 0.9, 1.1, 1.1, 1.2, 1.1, 2.2, 1.4, 0.5])
         col_ticker.markdown(f"**{row['Ticker']}**")
+        current_owned = bool(row.get("Owned", False))
+        updated_owned = col_owned.checkbox(
+            "V",
+            value=current_owned,
+            key=f"owned_{row['Ticker']}",
+            help=tr(lang, "owned_help"),
+        )
+        if updated_owned != current_owned:
+            st.session_state.watchlist[index]["Owned"] = bool(updated_owned)
+            save_watchlist()
+            st.rerun()
         col_price.markdown(f"**{tr(lang, 'live_price')}:** {format_quote_price(quote)}", unsafe_allow_html=True)
         col_change.markdown(format_quote_change(quote), unsafe_allow_html=True)
         current_buy_price = safe_float(row.get("BuyPrice"))
@@ -1232,6 +1250,7 @@ def render_watchlist(lang: str, settings: AdvisorSettings) -> None:
         if abs(updated_buy_price - current_buy_price) > 0.0001:
             st.session_state.watchlist[index]["BuyPrice"] = safe_float(updated_buy_price)
             save_watchlist()
+        col_pl.markdown(format_live_pl(row, quote, lang), unsafe_allow_html=True)
         col_notes.write(row.get("Notes") or "-")
         col_added.caption(f"{tr(lang, 'added')}: {row.get('Added', '-')}")
         col_added.caption(f"{tr(lang, 'quote_time')}: {quote.get('updated_at', '-')}")
@@ -1299,6 +1318,23 @@ def format_buy_price(row: dict[str, Any]) -> str:
     return f"${buy_price:,.2f}"
 
 
+def format_live_pl(row: dict[str, Any], quote: dict[str, Any], lang: str) -> str:
+    if not row.get("Owned"):
+        return f"<span style='color:#6b7280;'>{tr(lang, 'live_pl')}: -</span>"
+    buy_price = safe_float(row.get("BuyPrice"))
+    current_price = safe_float(quote.get("price"))
+    if buy_price <= 0 or current_price <= 0:
+        return f"<span style='color:#6b7280;'>{tr(lang, 'live_pl')}: N/A</span>"
+    profit_pct = ((current_price - buy_price) / buy_price) * 100
+    profit_amount = current_price - buy_price
+    color = "#15803d" if profit_amount >= 0 else "#b91c1c"
+    arrow = "▲" if profit_amount >= 0 else "▼"
+    return (
+        f"<span style='color:{color};font-weight:900;'>"
+        f"{tr(lang, 'live_pl')}: {arrow} ${profit_amount:,.2f} ({profit_pct:.2f}%)</span>"
+    )
+
+
 def safe_float(value: Any) -> float:
     try:
         number = float(value)
@@ -1345,6 +1381,7 @@ def load_watchlist() -> list[dict[str, str]]:
                     "Notes": str(row.get("Notes", "")),
                     "Added": str(row.get("Added", "")),
                     "BuyPrice": safe_float(row.get("BuyPrice")),
+                    "Owned": bool(row.get("Owned", False)),
                 }
             )
     return rows
@@ -1359,7 +1396,7 @@ def save_watchlist() -> None:
     )
 
 
-def add_to_watchlist(ticker: str, notes: str, lang: str, buy_price: float = 0.0) -> bool:
+def add_to_watchlist(ticker: str, notes: str, lang: str, buy_price: float = 0.0, owned: bool = False) -> bool:
     ensure_watchlist()
     ticker = ticker.upper().strip()
     if not ticker:
@@ -1374,6 +1411,7 @@ def add_to_watchlist(ticker: str, notes: str, lang: str, buy_price: float = 0.0)
             "Notes": notes,
             "Added": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "BuyPrice": safe_float(buy_price),
+            "Owned": bool(owned),
         }
     )
     save_watchlist()
@@ -1455,6 +1493,7 @@ def render_diagnostics_table(diagnostics: pd.DataFrame, lang: str) -> None:
                     "Added from diagnostics",
                     lang,
                     buy_price=safe_float(diagnostics.iloc[index].get("current_price")),
+                    owned=False,
                 )
                 st.rerun()
             original_row = diagnostics.iloc[index]

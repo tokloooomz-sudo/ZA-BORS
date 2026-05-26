@@ -107,3 +107,4 @@ The app is mobile-friendly in the browser. For phone access, deploy it online:
 - Watchlist quote refresh uses the configured data provider. `yfinance` is not guaranteed to be real-time; connect a paid market-data API for professional real-time prices.
 - Watchlist entries are persisted in `data/watchlist.json` until removed with the minus button.
 - Watchlist sell alerts warn when SPY drops more than 10% from its recent high or a watched stock gains 50% above its saved buy price.
+- Watchlist entries can be marked as actually bought with a checkbox, which enables live profit/loss indication against the saved buy price.
