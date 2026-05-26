@@ -105,3 +105,4 @@ The app is mobile-friendly in the browser. For phone access, deploy it online:
 - Always confirm that a ticker is available in your actual broker app before placing an order.
 - The Blink universe is an editable working list, not an official complete list from Blink.
 - Watchlist quote refresh uses the configured data provider. `yfinance` is not guaranteed to be real-time; connect a paid market-data API for professional real-time prices.
+- Watchlist entries are persisted in `data/watchlist.json` until removed with the minus button.

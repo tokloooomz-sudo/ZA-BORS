@@ -5,6 +5,7 @@ __pycache__/
 .env
 .env.*
 .streamlit/secrets.toml
+data/watchlist.json
 *.log
 .DS_Store
 Thumbs.db

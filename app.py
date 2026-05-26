@@ -6,6 +6,7 @@ import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -23,9 +24,11 @@ except ImportError:
 APP_NAME = "ZA-BORS"
 MIN_MARKET_CAP = 1_000_000_000
 MAJOR_EXCHANGES = {"NMS", "NYQ", "NGM", "NCM", "NASDAQ", "NYSE"}
-DEFAULT_UNIVERSE_PATH = "data/default_universe.csv"
-OPPORTUNITY_UNIVERSE_PATH = "data/opportunity_universe.csv"
-BLINK_UNIVERSE_PATH = "data/blink_universe.csv"
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_UNIVERSE_PATH = BASE_DIR / "data" / "default_universe.csv"
+OPPORTUNITY_UNIVERSE_PATH = BASE_DIR / "data" / "opportunity_universe.csv"
+BLINK_UNIVERSE_PATH = BASE_DIR / "data" / "blink_universe.csv"
+WATCHLIST_PATH = BASE_DIR / "data" / "watchlist.json"
 
 TRANSLATIONS = {
     "en": {
@@ -1233,7 +1236,38 @@ def colored_price(price: float, change: float, html: bool = False) -> str:
 
 def ensure_watchlist() -> None:
     if "watchlist" not in st.session_state or isinstance(st.session_state.watchlist, pd.DataFrame):
-        st.session_state.watchlist = []
+        st.session_state.watchlist = load_watchlist()
+
+
+def load_watchlist() -> list[dict[str, str]]:
+    if not WATCHLIST_PATH.exists():
+        return []
+    try:
+        data = json.loads(WATCHLIST_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    rows: list[dict[str, str]] = []
+    for row in data:
+        if isinstance(row, dict) and row.get("Ticker"):
+            rows.append(
+                {
+                    "Ticker": str(row.get("Ticker", "")).upper().strip(),
+                    "Notes": str(row.get("Notes", "")),
+                    "Added": str(row.get("Added", "")),
+                }
+            )
+    return rows
+
+
+def save_watchlist() -> None:
+    ensure_watchlist()
+    WATCHLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    WATCHLIST_PATH.write_text(
+        json.dumps(st.session_state.watchlist, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 def add_to_watchlist(ticker: str, notes: str, lang: str) -> bool:
@@ -1252,6 +1286,7 @@ def add_to_watchlist(ticker: str, notes: str, lang: str) -> bool:
             "Added": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         }
     )
+    save_watchlist()
     st.success(tr(lang, "added_to_watchlist").format(ticker=ticker))
     return True
 
@@ -1260,6 +1295,7 @@ def remove_from_watchlist(ticker: str) -> None:
     ensure_watchlist()
     ticker = ticker.upper().strip()
     st.session_state.watchlist = [row for row in st.session_state.watchlist if row["Ticker"] != ticker]
+    save_watchlist()
 
 
 def is_in_watchlist(ticker: str) -> bool:
@@ -1484,7 +1520,7 @@ def main() -> None:
     else:
         st.info(tr(lang, "no_signals"))
 
-    diagnostics_expanded = bool(st.session_state.get("diagnostics_open", False))
+    diagnostics_expanded = True
     with st.expander(tr(lang, "diagnostics"), expanded=diagnostics_expanded):
         if isinstance(diagnostics, pd.DataFrame) and not diagnostics.empty:
             render_diagnostics_table(diagnostics, lang)
