@@ -72,6 +72,8 @@ TRANSLATIONS = {
         "notes_placeholder": "Why are you watching it?",
         "add_watchlist": "Add to watchlist",
         "remove": "Remove",
+        "add_symbol": "+",
+        "remove_symbol": "-",
         "added_to_watchlist": "{ticker} was added to your watchlist.",
         "already_in_watchlist": "{ticker} is already in your watchlist.",
         "empty_watchlist": "Your watchlist is empty.",
@@ -172,6 +174,8 @@ TRANSLATIONS = {
         "notes_placeholder": "למה אתה עוקב אחריה?",
         "add_watchlist": "הוסף לרשימת מעקב",
         "remove": "הסר",
+        "add_symbol": "+",
+        "remove_symbol": "-",
         "added_to_watchlist": "{ticker} נוספה לרשימת המעקב.",
         "already_in_watchlist": "{ticker} כבר נמצאת ברשימת המעקב.",
         "empty_watchlist": "רשימת המעקב ריקה.",
@@ -1026,8 +1030,7 @@ def format_optional_number(value: Any) -> str:
 def render_watchlist(lang: str) -> None:
     st.subheader(tr(lang, "watchlist"))
     st.caption(tr(lang, "watchlist_help"))
-    if "watchlist" not in st.session_state:
-        st.session_state.watchlist = []
+    ensure_watchlist()
 
     with st.form("watchlist_form", clear_on_submit=True):
         col_a, col_b = st.columns([1, 3])
@@ -1036,18 +1039,7 @@ def render_watchlist(lang: str) -> None:
         submitted = st.form_submit_button(tr(lang, "add_watchlist"))
 
     if submitted and ticker:
-        existing = {row["Ticker"] for row in st.session_state.watchlist}
-        if ticker in existing:
-            st.warning(tr(lang, "already_in_watchlist").format(ticker=ticker))
-        else:
-            st.session_state.watchlist.append(
-                {
-                    "Ticker": ticker,
-                    "Notes": notes,
-                    "Added": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                }
-            )
-            st.success(tr(lang, "added_to_watchlist").format(ticker=ticker))
+        add_to_watchlist(ticker, notes, lang)
 
     if not st.session_state.watchlist:
         st.info(tr(lang, "empty_watchlist"))
@@ -1058,9 +1050,40 @@ def render_watchlist(lang: str) -> None:
         col_ticker.markdown(f"**{row['Ticker']}**")
         col_notes.write(row.get("Notes") or "-")
         col_added.caption(f"{tr(lang, 'added')}: {row.get('Added', '-')}")
-        if col_remove.button(tr(lang, "remove"), key=f"remove_watchlist_{index}_{row['Ticker']}"):
-            st.session_state.watchlist.pop(index)
+        if col_remove.button(tr(lang, "remove_symbol"), key=f"remove_watchlist_{index}_{row['Ticker']}", help=tr(lang, "remove")):
+            remove_from_watchlist(row["Ticker"])
             st.rerun()
+
+
+def ensure_watchlist() -> None:
+    if "watchlist" not in st.session_state or isinstance(st.session_state.watchlist, pd.DataFrame):
+        st.session_state.watchlist = []
+
+
+def add_to_watchlist(ticker: str, notes: str, lang: str) -> bool:
+    ensure_watchlist()
+    ticker = ticker.upper().strip()
+    if not ticker:
+        return False
+    existing = {row["Ticker"] for row in st.session_state.watchlist}
+    if ticker in existing:
+        st.warning(tr(lang, "already_in_watchlist").format(ticker=ticker))
+        return False
+    st.session_state.watchlist.append(
+        {
+            "Ticker": ticker,
+            "Notes": notes,
+            "Added": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        }
+    )
+    st.success(tr(lang, "added_to_watchlist").format(ticker=ticker))
+    return True
+
+
+def remove_from_watchlist(ticker: str) -> None:
+    ensure_watchlist()
+    ticker = ticker.upper().strip()
+    st.session_state.watchlist = [row for row in st.session_state.watchlist if row["Ticker"] != ticker]
 
 
 def localize_diagnostics(df: pd.DataFrame, lang: str) -> pd.DataFrame:
@@ -1085,6 +1108,33 @@ def localize_diagnostics(df: pd.DataFrame, lang: str) -> pd.DataFrame:
         }
         localized = localized.rename(columns=column_names)
     return localized
+
+
+def render_diagnostics_table(diagnostics: pd.DataFrame, lang: str) -> None:
+    if diagnostics.empty:
+        st.caption(tr(lang, "diagnostics_wait"))
+        return
+
+    display_df = localize_diagnostics(diagnostics, lang)
+    headers = ["", *display_df.columns.tolist()]
+    column_widths = [0.35, 0.8, 0.8, 0.8, 1.15, 0.85, 1.25, 0.85, 1.25, 1.0, 2.3]
+    header_cols = st.columns(column_widths[: len(headers)])
+    for col, header in zip(header_cols, headers):
+        col.caption(header)
+
+    for index, (_, row) in enumerate(display_df.iterrows()):
+        original_ticker = str(diagnostics.iloc[index]["ticker"]).upper()
+        cols = st.columns(column_widths[: len(headers)])
+        if cols[0].button(tr(lang, "add_symbol"), key=f"add_diag_{index}_{original_ticker}", help=tr(lang, "add_watchlist")):
+            add_to_watchlist(original_ticker, "Added from diagnostics", lang)
+            st.rerun()
+        for col, value in zip(cols[1:], row.tolist()):
+            if isinstance(value, (float, np.floating)):
+                col.write(f"{value:.2f}")
+            elif isinstance(value, (bool, np.bool_)):
+                col.write("כן" if lang == "he" and value else "Yes" if value else "לא" if lang == "he" else "No")
+            else:
+                col.write(value)
 
 
 def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
@@ -1213,7 +1263,7 @@ def main() -> None:
 
     with st.expander(tr(lang, "diagnostics"), expanded=False):
         if isinstance(diagnostics, pd.DataFrame) and not diagnostics.empty:
-            st.dataframe(localize_diagnostics(diagnostics, lang), use_container_width=True)
+            render_diagnostics_table(diagnostics, lang)
         else:
             st.caption(tr(lang, "diagnostics_wait"))
 
