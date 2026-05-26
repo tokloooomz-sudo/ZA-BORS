@@ -33,6 +33,7 @@ Personal Streamlit dashboard for professional-style US stock research and "buy l
 - Watchlist quotes show price, daily change, green/red direction arrows, and can auto-refresh while the app is open.
 - Diagnostics rows include the latest price captured during the scan.
 - Price text is colored green when up, red when down, and yellow/orange when unchanged.
+- Advisor verdicts are color-coded: green for strong, yellow/orange for watch, red for avoid.
 - Supports English and Hebrew UI with right-to-left layout in Hebrew.
 
 ## Professional Advisor Mode

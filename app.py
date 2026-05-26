@@ -1035,6 +1035,7 @@ def render_signal_card(signal: dict[str, Any], lang: str) -> None:
         if item.get("url")
     )
     verdict = tr(lang, VERDICT_TO_KEY.get(advisor["verdict"], advisor["verdict"]))
+    verdict_html = colored_verdict(verdict)
     profile = tr(lang, PROFILE_TO_KEY.get(advisor["profile"], advisor["profile"]))
     catalyst_summary = translate_catalyst_summary(catalyst.summary, lang)
     catalyst_type = translate_catalyst_type(catalyst.catalyst_type, lang)
@@ -1047,7 +1048,7 @@ def render_signal_card(signal: dict[str, Any], lang: str) -> None:
                 <div class="price-text">${signal["current_price"]:.2f}</div>
             </div>
             <div class="advisor-verdict">
-                <strong>{tr(lang, "advisor_view")}:</strong> {verdict} | {tr(lang, "score")} {advisor["score"]}/100 | {tr(lang, "profile")}: {profile}
+                <strong>{tr(lang, "advisor_view")}:</strong> {verdict_html} | {tr(lang, "score")} {advisor["score"]}/100 | {tr(lang, "profile")}: {profile}
             </div>
             <p><strong>{tr(lang, "catalyst")}:</strong> {catalyst_summary}</p>
             <span class="pill">RSI 14D: {rsi:.1f} {rsi_badge}</span>
@@ -1084,6 +1085,20 @@ def translate_catalyst_type(catalyst_type: str, lang: str) -> str:
 
 def translate_verdict(verdict: str, lang: str) -> str:
     return tr(lang, VERDICT_TO_KEY.get(verdict, verdict))
+
+
+def verdict_color(verdict: str) -> str:
+    normalized = str(verdict)
+    if normalized in {"Strong research candidate", "כדאי מאוד"}:
+        return "#15803d"
+    if normalized in {"Watch closely", "כדאי לעקוב"}:
+        return "#b45309"
+    return "#b91c1c"
+
+
+def colored_verdict(verdict: str) -> str:
+    color = verdict_color(verdict)
+    return f"<span style='color:{color};font-weight:900;'>{verdict}</span>"
 
 
 def translate_market_label(label: str, lang: str) -> str:
@@ -1317,6 +1332,8 @@ def render_diagnostics_table(diagnostics: pd.DataFrame, lang: str) -> None:
                 if column_name == tr(lang, "diag_price") and isinstance(value, (float, np.floating, int, np.integer)):
                     change = float(original_row.get("daily_change", 0) or 0)
                     col.markdown(colored_price(float(value), change, html=True), unsafe_allow_html=True)
+                elif column_name == tr(lang, "diag_verdict"):
+                    col.markdown(colored_verdict(str(value)), unsafe_allow_html=True)
                 elif isinstance(value, (float, np.floating)):
                     col.write(f"{value:.2f}")
                 elif isinstance(value, (bool, np.bool_)):
