@@ -67,9 +67,15 @@ TRANSLATIONS = {
         "diagnostics": "Diagnostics / filtered tickers",
         "diagnostics_wait": "Diagnostics will appear after the first scan.",
         "watchlist": "My Watchlist",
+        "watchlist_help": "Type a ticker and optional note, then press Add. The list is saved for this app session.",
         "notes": "Notes",
         "notes_placeholder": "Why are you watching it?",
         "add_watchlist": "Add to watchlist",
+        "remove": "Remove",
+        "added_to_watchlist": "{ticker} was added to your watchlist.",
+        "already_in_watchlist": "{ticker} is already in your watchlist.",
+        "empty_watchlist": "Your watchlist is empty.",
+        "added": "Added",
         "starting_scan": "Starting scan...",
         "scanning": "Scanning",
         "advisor_view": "Advisor View",
@@ -161,9 +167,15 @@ TRANSLATIONS = {
         "diagnostics": "אבחון / מניות שסוננו",
         "diagnostics_wait": "האבחון יופיע לאחר הסריקה הראשונה.",
         "watchlist": "רשימת מעקב אישית",
+        "watchlist_help": "כתוב סימול מניה והערה אופציונלית, ואז לחץ הוסף. הרשימה נשמרת בסשן של האפליקציה.",
         "notes": "הערות",
         "notes_placeholder": "למה אתה עוקב אחריה?",
         "add_watchlist": "הוסף לרשימת מעקב",
+        "remove": "הסר",
+        "added_to_watchlist": "{ticker} נוספה לרשימת המעקב.",
+        "already_in_watchlist": "{ticker} כבר נמצאת ברשימת המעקב.",
+        "empty_watchlist": "רשימת המעקב ריקה.",
+        "added": "נוסף בתאריך",
         "starting_scan": "מתחיל סריקה...",
         "scanning": "סורק",
         "advisor_view": "מבט יועץ",
@@ -1013,22 +1025,42 @@ def format_optional_number(value: Any) -> str:
 
 def render_watchlist(lang: str) -> None:
     st.subheader(tr(lang, "watchlist"))
+    st.caption(tr(lang, "watchlist_help"))
     if "watchlist" not in st.session_state:
-        st.session_state.watchlist = pd.DataFrame(columns=["Ticker", "Notes", "Added"])
+        st.session_state.watchlist = []
 
     with st.form("watchlist_form", clear_on_submit=True):
         col_a, col_b = st.columns([1, 3])
-        ticker = col_a.text_input("Ticker", placeholder="AAPL").upper()
+        ticker = col_a.text_input("Ticker", placeholder="FUTU").upper().strip()
         notes = col_b.text_input(tr(lang, "notes"), placeholder=tr(lang, "notes_placeholder"))
         submitted = st.form_submit_button(tr(lang, "add_watchlist"))
 
     if submitted and ticker:
-        new_row = pd.DataFrame(
-            [{"Ticker": ticker, "Notes": notes, "Added": datetime.now(timezone.utc).strftime("%Y-%m-%d")}]
-        )
-        st.session_state.watchlist = pd.concat([st.session_state.watchlist, new_row], ignore_index=True)
+        existing = {row["Ticker"] for row in st.session_state.watchlist}
+        if ticker in existing:
+            st.warning(tr(lang, "already_in_watchlist").format(ticker=ticker))
+        else:
+            st.session_state.watchlist.append(
+                {
+                    "Ticker": ticker,
+                    "Notes": notes,
+                    "Added": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                }
+            )
+            st.success(tr(lang, "added_to_watchlist").format(ticker=ticker))
 
-    st.data_editor(st.session_state.watchlist, use_container_width=True, num_rows="dynamic")
+    if not st.session_state.watchlist:
+        st.info(tr(lang, "empty_watchlist"))
+        return
+
+    for index, row in enumerate(list(st.session_state.watchlist)):
+        col_ticker, col_notes, col_added, col_remove = st.columns([1, 4, 1.4, 1])
+        col_ticker.markdown(f"**{row['Ticker']}**")
+        col_notes.write(row.get("Notes") or "-")
+        col_added.caption(f"{tr(lang, 'added')}: {row.get('Added', '-')}")
+        if col_remove.button(tr(lang, "remove"), key=f"remove_watchlist_{index}_{row['Ticker']}"):
+            st.session_state.watchlist.pop(index)
+            st.rerun()
 
 
 def localize_diagnostics(df: pd.DataFrame, lang: str) -> pd.DataFrame:
