@@ -179,6 +179,29 @@ def tr(lang: str, key: str) -> str:
     return TRANSLATIONS.get(lang, TRANSLATIONS["en"]).get(key, TRANSLATIONS["en"].get(key, key))
 
 
+def language_selector() -> str:
+    query_lang = st.query_params.get("lang", "en")
+    if isinstance(query_lang, list):
+        query_lang = query_lang[0] if query_lang else "en"
+    default_lang = "he" if query_lang == "he" else "en"
+    options = ["English", "עברית"]
+    default_index = 1 if default_lang == "he" else 0
+
+    language_label = st.sidebar.radio(
+        "Language / שפה",
+        options,
+        index=default_index,
+        horizontal=True,
+        key="language_selector",
+    )
+    lang = "he" if language_label == "עברית" else "en"
+
+    if st.query_params.get("lang") != lang:
+        st.query_params["lang"] = lang
+
+    return lang
+
+
 @dataclass
 class CatalystResult:
     ticker: str
@@ -895,8 +918,7 @@ def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
 
 def main() -> None:
     page_setup()
-    language_label = st.sidebar.radio("Language / שפה", ["English", "עברית"], horizontal=True)
-    lang = "he" if language_label == "עברית" else "en"
+    lang = language_selector()
     apply_language_css(lang)
     tickers, max_news_items, advisor_settings = sidebar_controls(lang)
 
