@@ -106,3 +106,4 @@ The app is mobile-friendly in the browser. For phone access, deploy it online:
 - The Blink universe is an editable working list, not an official complete list from Blink.
 - Watchlist quote refresh uses the configured data provider. `yfinance` is not guaranteed to be real-time; connect a paid market-data API for professional real-time prices.
 - Watchlist entries are persisted in `data/watchlist.json` until removed with the minus button.
+- Watchlist sell alerts warn when SPY drops more than 10% from its recent high or a watched stock gains 50% above its saved buy price.

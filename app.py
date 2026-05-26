@@ -80,6 +80,7 @@ TRANSLATIONS = {
         "watchlist_help": "Type a ticker and optional note, then press Add. Prices refresh automatically while the app is open.",
         "notes": "Notes",
         "notes_placeholder": "Why are you watching it?",
+        "buy_price": "Buy price",
         "add_watchlist": "Add to watchlist",
         "remove": "Remove",
         "add_symbol": "+",
@@ -92,6 +93,11 @@ TRANSLATIONS = {
         "daily_change": "Change",
         "quote_time": "Quote update",
         "quote_unavailable": "Quote unavailable",
+        "sell_alerts": "Sell alerts",
+        "no_sell_alerts": "No sell alerts right now.",
+        "market_sell_alert": "Market risk: SPY is down {drop:.2f}% from its recent high. Consider reducing risk.",
+        "profit_sell_alert": "{ticker} is up {profit:.2f}% from your buy price. Consider taking profit.",
+        "missing_buy_price": "Add a buy price to enable 50% profit alerts.",
         "auto_refresh": "Auto-refresh watchlist quotes",
         "refresh_seconds": "Quote refresh interval (seconds)",
         "delayed_quotes": "Prices use the configured data provider and may be delayed. For true real-time quotes, connect a paid market-data API.",
@@ -193,6 +199,7 @@ TRANSLATIONS = {
         "watchlist_help": "כתוב סימול מניה והערה אופציונלית, ואז לחץ הוסף. המחירים מתרעננים אוטומטית כל עוד האפליקציה פתוחה.",
         "notes": "הערות",
         "notes_placeholder": "למה אתה עוקב אחריה?",
+        "buy_price": "מחיר קנייה",
         "add_watchlist": "הוסף לרשימת מעקב",
         "remove": "הסר",
         "add_symbol": "+",
@@ -205,6 +212,11 @@ TRANSLATIONS = {
         "daily_change": "שינוי",
         "quote_time": "עדכון מחיר",
         "quote_unavailable": "אין מחיר זמין",
+        "sell_alerts": "התראות מכירה",
+        "no_sell_alerts": "אין כרגע התראות מכירה.",
+        "market_sell_alert": "התראת שוק: SPY ירד {drop:.2f}% מהשיא האחרון. כדאי לשקול הקטנת סיכון.",
+        "profit_sell_alert": "{ticker} ברווח של {profit:.2f}% ממחיר הקנייה שלך. כדאי לשקול מימוש רווח.",
+        "missing_buy_price": "הוסף מחיר קנייה כדי לקבל התראה על רווח מעל 50%.",
         "auto_refresh": "רענון אוטומטי למחירי רשימת המעקב",
         "refresh_seconds": "מרווח רענון מחירים בשניות",
         "delayed_quotes": "המחירים מגיעים מספק הנתונים המוגדר ויכולים להיות מעוכבים. לזמן אמת מלא צריך לחבר API שוק מקצועי בתשלום.",
@@ -534,6 +546,24 @@ def fetch_watchlist_quote(ticker: str) -> dict[str, Any]:
         "change": change,
         "change_pct": change_pct,
         "updated_at": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
+    }
+
+
+@st.cache_data(ttl=60)
+def fetch_market_sell_risk() -> dict[str, Any]:
+    history = yf.Ticker("SPY").history(period="6mo", interval="1d")
+    if history.empty:
+        return {"ticker": "SPY", "drop_from_high": 0.0, "triggered": False}
+    close = history["Close"].dropna()
+    current = float(close.iloc[-1])
+    recent_high = float(close.max())
+    drop_from_high = ((recent_high - current) / recent_high) * 100 if recent_high else 0.0
+    return {
+        "ticker": "SPY",
+        "current": current,
+        "recent_high": recent_high,
+        "drop_from_high": drop_from_high,
+        "triggered": drop_from_high >= 10,
     }
 
 
@@ -1170,24 +1200,38 @@ def render_watchlist(lang: str, settings: AdvisorSettings) -> None:
         )
 
     with st.form("watchlist_form", clear_on_submit=True):
-        col_a, col_b = st.columns([1, 3])
+        col_a, col_price, col_b = st.columns([1, 1, 3])
         ticker = col_a.text_input("Ticker", placeholder="FUTU").upper().strip()
+        buy_price = col_price.number_input(tr(lang, "buy_price"), min_value=0.0, value=0.0, step=1.0)
         notes = col_b.text_input(tr(lang, "notes"), placeholder=tr(lang, "notes_placeholder"))
         submitted = st.form_submit_button(tr(lang, "add_watchlist"))
 
     if submitted and ticker:
-        add_to_watchlist(ticker, notes, lang)
+        add_to_watchlist(ticker, notes, lang, buy_price=buy_price)
 
     if not st.session_state.watchlist:
         st.info(tr(lang, "empty_watchlist"))
         return
 
+    render_sell_alerts(lang)
+
     for index, row in enumerate(list(st.session_state.watchlist)):
         quote = fetch_watchlist_quote(row["Ticker"])
-        col_ticker, col_price, col_change, col_notes, col_added, col_remove = st.columns([1, 1.1, 1.1, 3, 1.4, 0.5])
+        col_ticker, col_price, col_change, col_buy, col_notes, col_added, col_remove = st.columns([1, 1.1, 1.1, 1.1, 2.5, 1.4, 0.5])
         col_ticker.markdown(f"**{row['Ticker']}**")
         col_price.markdown(f"**{tr(lang, 'live_price')}:** {format_quote_price(quote)}", unsafe_allow_html=True)
         col_change.markdown(format_quote_change(quote), unsafe_allow_html=True)
+        current_buy_price = safe_float(row.get("BuyPrice"))
+        updated_buy_price = col_buy.number_input(
+            tr(lang, "buy_price"),
+            min_value=0.0,
+            value=float(current_buy_price),
+            step=1.0,
+            key=f"row_buy_price_{row['Ticker']}",
+        )
+        if abs(updated_buy_price - current_buy_price) > 0.0001:
+            st.session_state.watchlist[index]["BuyPrice"] = safe_float(updated_buy_price)
+            save_watchlist()
         col_notes.write(row.get("Notes") or "-")
         col_added.caption(f"{tr(lang, 'added')}: {row.get('Added', '-')}")
         col_added.caption(f"{tr(lang, 'quote_time')}: {quote.get('updated_at', '-')}")
@@ -1219,6 +1263,50 @@ def format_quote_change(quote: dict[str, Any]) -> str:
         f"<span style='color:{color};font-weight:800;font-size:1.05rem;'>"
         f"{arrow} ${change:,.2f} ({change_pct:.2f}%)</span>"
     )
+
+
+def render_sell_alerts(lang: str) -> None:
+    alerts: list[str] = []
+    market_risk = fetch_market_sell_risk()
+    if market_risk.get("triggered"):
+        alerts.append(tr(lang, "market_sell_alert").format(drop=market_risk["drop_from_high"]))
+
+    for row in st.session_state.watchlist:
+        buy_price = safe_float(row.get("BuyPrice"))
+        if buy_price <= 0:
+            continue
+        quote = fetch_watchlist_quote(row["Ticker"])
+        current_price = safe_float(quote.get("price"))
+        if current_price <= 0:
+            continue
+        profit_pct = ((current_price - buy_price) / buy_price) * 100
+        if profit_pct >= 50:
+            alerts.append(tr(lang, "profit_sell_alert").format(ticker=row["Ticker"], profit=profit_pct))
+
+    with st.container(border=True):
+        st.subheader(tr(lang, "sell_alerts"))
+        if alerts:
+            for alert in alerts:
+                st.warning(alert)
+        else:
+            st.success(tr(lang, "no_sell_alerts"))
+
+
+def format_buy_price(row: dict[str, Any]) -> str:
+    buy_price = safe_float(row.get("BuyPrice"))
+    if buy_price <= 0:
+        return "N/A"
+    return f"${buy_price:,.2f}"
+
+
+def safe_float(value: Any) -> float:
+    try:
+        number = float(value)
+        if np.isfinite(number):
+            return number
+    except (TypeError, ValueError):
+        pass
+    return 0.0
 
 
 def colored_price(price: float, change: float, html: bool = False) -> str:
@@ -1256,6 +1344,7 @@ def load_watchlist() -> list[dict[str, str]]:
                     "Ticker": str(row.get("Ticker", "")).upper().strip(),
                     "Notes": str(row.get("Notes", "")),
                     "Added": str(row.get("Added", "")),
+                    "BuyPrice": safe_float(row.get("BuyPrice")),
                 }
             )
     return rows
@@ -1270,7 +1359,7 @@ def save_watchlist() -> None:
     )
 
 
-def add_to_watchlist(ticker: str, notes: str, lang: str) -> bool:
+def add_to_watchlist(ticker: str, notes: str, lang: str, buy_price: float = 0.0) -> bool:
     ensure_watchlist()
     ticker = ticker.upper().strip()
     if not ticker:
@@ -1284,6 +1373,7 @@ def add_to_watchlist(ticker: str, notes: str, lang: str) -> bool:
             "Ticker": ticker,
             "Notes": notes,
             "Added": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "BuyPrice": safe_float(buy_price),
         }
     )
     save_watchlist()
@@ -1360,7 +1450,12 @@ def render_diagnostics_table(diagnostics: pd.DataFrame, lang: str) -> None:
                 disabled=is_watched,
             ):
                 st.session_state.diagnostics_open = True
-                add_to_watchlist(original_ticker, "Added from diagnostics", lang)
+                add_to_watchlist(
+                    original_ticker,
+                    "Added from diagnostics",
+                    lang,
+                    buy_price=safe_float(diagnostics.iloc[index].get("current_price")),
+                )
                 st.rerun()
             original_row = diagnostics.iloc[index]
             price_column = tr(lang, "diag_price")
