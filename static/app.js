@@ -6,10 +6,11 @@ const loadingBar = document.querySelector("#loadingBar");
 
 document.querySelector("#scanButton").addEventListener("click", scan);
 document.querySelector("#refreshWatchlist").addEventListener("click", () => loadWatchlist(true));
+document.querySelector("#logoutButton").addEventListener("click", logout);
 document.querySelector("#watchForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   await withLoading(async () => {
-    await fetch("/api/watchlist", {
+    await apiFetch("/api/watchlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -33,7 +34,7 @@ async function scan() {
       min_investment: Number(document.querySelector("#minInvestment").value || 100),
       max_investment: Number(document.querySelector("#maxInvestment").value || 1000)
     };
-    const res = await fetch("/api/scan", {
+    const res = await apiFetch("/api/scan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -74,7 +75,7 @@ function renderSignals(rows) {
 
 async function addTicker(ticker, price) {
   await withLoading(async () => {
-    await fetch("/api/watchlist", {
+    await apiFetch("/api/watchlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ticker, buy_price: price, owned: false, notes: "Added from scan" })
@@ -95,7 +96,7 @@ let watchedTickers = new Set();
 async function loadWatchlist(showLoading = false) {
   if (showLoading) startLoading();
   try {
-    const res = await fetch("/api/watchlist");
+    const res = await apiFetch("/api/watchlist");
     const data = await res.json();
     watchedTickers = new Set(data.items.map(item => item.Ticker));
     renderAlerts(data);
@@ -148,7 +149,7 @@ function renderWatchlist(items) {
 
 async function updateTicker(ticker, owned, buyPrice, notes) {
   await withLoading(async () => {
-    await fetch(`/api/watchlist/${ticker}`, {
+    await apiFetch(`/api/watchlist/${ticker}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ticker, owned, buy_price: Number(buyPrice || 0), notes })
@@ -159,7 +160,7 @@ async function updateTicker(ticker, owned, buyPrice, notes) {
 
 async function removeTicker(ticker) {
   await withLoading(async () => {
-    await fetch(`/api/watchlist/${ticker}`, { method: "DELETE" });
+    await apiFetch(`/api/watchlist/${ticker}`, { method: "DELETE" });
     await loadWatchlist(false);
   });
 }
@@ -180,6 +181,20 @@ async function withLoading(task) {
   } finally {
     finishLoading();
   }
+}
+
+async function apiFetch(url, options) {
+  const response = await fetch(url, options);
+  if (response.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Login required");
+  }
+  return response;
+}
+
+async function logout() {
+  await fetch("/api/logout", { method: "POST" });
+  window.location.href = "/login";
 }
 
 function startLoading() {

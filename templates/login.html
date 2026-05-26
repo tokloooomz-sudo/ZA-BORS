@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ app_name }} Login</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="login-page">
+    <main class="login-shell">
+      <section class="login-card">
+        <div class="login-brand">
+          <span>ZA-BORS</span>
+          <h1>כניסה מאובטחת</h1>
+          <p>הגישה למערכת פרטית. התחבר כדי לפתוח את סורק המניות ורשימת המעקב שלך.</p>
+        </div>
+
+        <form id="loginForm" class="login-form">
+          <label>
+            שם משתמש
+            <input id="loginUsername" autocomplete="username" required />
+          </label>
+          <label>
+            סיסמה
+            <input id="loginPassword" type="password" autocomplete="current-password" required />
+          </label>
+          <button class="primary" type="submit">כניסה</button>
+          <p id="loginError" class="login-error" role="alert"></p>
+        </form>
+      </section>
+    </main>
+
+    <script>
+      const form = document.querySelector("#loginForm");
+      const errorEl = document.querySelector("#loginError");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        errorEl.textContent = "";
+
+        const response = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: document.querySelector("#loginUsername").value,
+            password: document.querySelector("#loginPassword").value
+          })
+        });
+
+        if (response.ok) {
+          window.location.href = "/";
+          return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+        errorEl.textContent = data.message || "לא ניתן להתחבר. בדוק את הפרטים ונסה שוב.";
+      });
+    </script>
+  </body>
+</html>

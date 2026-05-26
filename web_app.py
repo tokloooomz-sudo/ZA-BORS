@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import time
+from hashlib import sha256
+from hmac import compare_digest, new as hmac_new
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -10,9 +13,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pydantic import BaseModel
@@ -22,7 +24,8 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 WATCHLIST_PATH = DATA_DIR / "watchlist.json"
 BLINK_UNIVERSE_PATH = DATA_DIR / "blink_universe.csv"
-security = HTTPBasic(auto_error=False)
+SESSION_COOKIE = "za_bors_session"
+SESSION_MAX_AGE = 60 * 60 * 24 * 7
 
 app = FastAPI(title="ZA-BORS")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -46,36 +49,122 @@ class ScanRequest(BaseModel):
     max_investment: float = 1000
 
 
-def require_login(credentials: HTTPBasicCredentials | None = Depends(security)) -> str:
+def auth_settings() -> tuple[str | None, str | None]:
+    return os.getenv("ZA_BORS_USERNAME"), os.getenv("ZA_BORS_PASSWORD")
+
+
+def session_secret() -> str:
+    return os.getenv("ZA_BORS_SESSION_SECRET") or os.getenv("ZA_BORS_PASSWORD") or "local-dev"
+
+
+def sign_session(username: str) -> str:
+    issued_at = str(int(time.time()))
+    payload = f"{username}:{issued_at}"
+    signature = hmac_new(session_secret().encode(), payload.encode(), sha256).hexdigest()
+    return f"{payload}:{signature}"
+
+
+def verify_session(token: str | None) -> str | None:
+    if not token:
+        return None
+
+    parts = token.split(":")
+    if len(parts) != 3:
+        return None
+
+    username, issued_at, signature = parts
+    payload = f"{username}:{issued_at}"
+    expected = hmac_new(session_secret().encode(), payload.encode(), sha256).hexdigest()
+    if not compare_digest(signature, expected):
+        return None
+
+    try:
+        age = time.time() - int(issued_at)
+    except ValueError:
+        return None
+
+    if age > SESSION_MAX_AGE:
+        return None
+    return username
+
+
+def require_login(request: Request) -> str:
     expected_username = os.getenv("ZA_BORS_USERNAME")
     expected_password = os.getenv("ZA_BORS_PASSWORD")
 
     if not expected_username or not expected_password:
         return "local"
 
-    if credentials is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Login required",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-
-    username_ok = secrets.compare_digest(credentials.username, expected_username)
-    password_ok = secrets.compare_digest(credentials.password, expected_password)
-    if username_ok and password_ok:
-        return credentials.username
+    username = verify_session(request.cookies.get(SESSION_COOKIE))
+    if username:
+        return username
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Incorrect username or password",
-        headers={"WWW-Authenticate": "Basic"},
+        detail="Login required",
     )
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(_: str = Depends(require_login)) -> str:
+def home(request: Request):
+    expected_username, expected_password = auth_settings()
+    if expected_username and expected_password and not verify_session(request.cookies.get(SESSION_COOKIE)):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+
     template = templates.get_template("index.html")
     return template.render(app_name="ZA-BORS")
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    expected_username, expected_password = auth_settings()
+    if expected_username and expected_password and verify_session(request.cookies.get(SESSION_COOKIE)):
+        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+
+    template = templates.get_template("login.html")
+    return template.render(app_name="ZA-BORS", error="")
+
+
+@app.post("/api/login")
+async def login(request: Request) -> JSONResponse:
+    expected_username, expected_password = auth_settings()
+    if not expected_username or not expected_password:
+        response = JSONResponse({"ok": True})
+        response.set_cookie(
+            SESSION_COOKIE,
+            sign_session("local"),
+            httponly=True,
+            secure=request.url.scheme == "https",
+            samesite="lax",
+            max_age=SESSION_MAX_AGE,
+        )
+        return response
+
+    payload = await request.json()
+    username = str(payload.get("username", ""))
+    password = str(payload.get("password", ""))
+    username_ok = secrets.compare_digest(username, expected_username)
+    password_ok = secrets.compare_digest(password, expected_password)
+    if not username_ok or not password_ok:
+        return JSONResponse({"ok": False, "message": "שם משתמש או סיסמה לא נכונים"}, status_code=401)
+
+    response = JSONResponse({"ok": True})
+    response.set_cookie(
+        SESSION_COOKIE,
+        sign_session(username),
+        httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        max_age=SESSION_MAX_AGE,
+    )
+    return response
+
+
+@app.post("/api/logout")
+def logout() -> JSONResponse:
+    response = JSONResponse({"ok": True})
+    response.delete_cookie(SESSION_COOKIE)
+    return response
 
 
 @app.get("/api/universe")
