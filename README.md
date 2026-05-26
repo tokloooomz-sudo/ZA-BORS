@@ -34,6 +34,7 @@ Personal Streamlit dashboard for professional-style US stock research and "buy l
 - Diagnostics rows include the latest price captured during the scan.
 - Price text is colored green when up, red when down, and yellow/orange when unchanged.
 - Advisor verdicts are color-coded: green for strong, yellow/orange for watch, red for avoid.
+- Diagnostics are sorted by advisor verdict: strong first, watch next, avoid last.
 - Supports English and Hebrew UI with right-to-left layout in Hebrew.
 
 ## Professional Advisor Mode

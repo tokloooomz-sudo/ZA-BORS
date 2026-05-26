@@ -1458,12 +1458,34 @@ def localize_diagnostics(df: pd.DataFrame, lang: str) -> pd.DataFrame:
     return localized
 
 
+def sort_diagnostics(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or "verdict" not in df.columns:
+        return df
+    order = {
+        "כדאי מאוד": 0,
+        "Strong research candidate": 0,
+        "כדאי לעקוב": 1,
+        "Watch closely": 1,
+        "לא כדאי עכשיו": 2,
+        "Do not chase": 2,
+    }
+    sorted_df = df.copy()
+    sorted_df["_verdict_order"] = sorted_df["verdict"].map(lambda value: order.get(str(value), 3))
+    sorted_df = sorted_df.sort_values(
+        by=["_verdict_order", "advisor_score"],
+        ascending=[True, False],
+        na_position="last",
+    )
+    return sorted_df.drop(columns=["_verdict_order"])
+
+
 def render_diagnostics_table(diagnostics: pd.DataFrame, lang: str) -> None:
     if diagnostics.empty:
         st.caption(tr(lang, "diagnostics_wait"))
         return
 
-    display_df = localize_diagnostics(diagnostics, lang)
+    sorted_diagnostics = sort_diagnostics(diagnostics).reset_index(drop=True)
+    display_df = localize_diagnostics(sorted_diagnostics, lang).reset_index(drop=True)
     headers = ["", *display_df.columns.tolist()]
     column_widths = [0.35, 0.8, 0.9, 0.8, 0.8, 1.15, 0.85, 1.25, 0.85, 1.25, 1.0, 2.3]
     header_cols = st.columns(column_widths[: len(headers)])
@@ -1471,7 +1493,8 @@ def render_diagnostics_table(diagnostics: pd.DataFrame, lang: str) -> None:
         col.caption(header)
 
     for index, (_, row) in enumerate(display_df.iterrows()):
-        original_ticker = str(diagnostics.iloc[index]["ticker"]).upper()
+        original_row = sorted_diagnostics.iloc[index]
+        original_ticker = str(original_row["ticker"]).upper()
         is_watched = is_in_watchlist(original_ticker)
         row_container = st.container(border=is_watched)
         if is_watched:
@@ -1492,11 +1515,10 @@ def render_diagnostics_table(diagnostics: pd.DataFrame, lang: str) -> None:
                     original_ticker,
                     "Added from diagnostics",
                     lang,
-                    buy_price=safe_float(diagnostics.iloc[index].get("current_price")),
+                    buy_price=safe_float(original_row.get("current_price")),
                     owned=False,
                 )
                 st.rerun()
-            original_row = diagnostics.iloc[index]
             price_column = tr(lang, "diag_price")
             for col, (column_name, value) in zip(cols[1:], row.items()):
                 if column_name == tr(lang, "diag_price") and isinstance(value, (float, np.floating, int, np.integer)):
