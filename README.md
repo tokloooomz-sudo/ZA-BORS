@@ -30,6 +30,7 @@ Personal Streamlit dashboard for professional-style US stock research and "buy l
 - Includes a simple manual watchlist.
 - Watchlist entries are added through a simple ticker form and can be removed from the page.
 - Watchlist quotes show price, daily change, green/red direction arrows, and can auto-refresh while the app is open.
+- Diagnostics rows include the latest price captured during the scan.
 - Supports English and Hebrew UI with right-to-left layout in Hebrew.
 
 ## Professional Advisor Mode

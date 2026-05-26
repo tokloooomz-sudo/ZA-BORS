@@ -116,6 +116,7 @@ TRANSLATIONS = {
         "filtered": "Filtered",
         "error": "Error",
         "diag_ticker": "Ticker",
+        "diag_price": "Live price",
         "diag_status": "Status",
         "diag_exchange": "Exchange",
         "diag_market_cap": "Market cap",
@@ -225,6 +226,7 @@ TRANSLATIONS = {
         "filtered": "סונן",
         "error": "שגיאה",
         "diag_ticker": "סימול",
+        "diag_price": "מחיר מניה",
         "diag_status": "סטטוס",
         "diag_exchange": "בורסה",
         "diag_market_cap": "שווי שוק",
@@ -842,6 +844,7 @@ def scan_tickers(
             diagnostics.append(
                 {
                     "ticker": ticker,
+                    "current_price": technicals["current_price"],
                     "status": tr(lang, "signal") if advisor["is_actionable"] else tr(lang, "filtered"),
                     "exchange": technicals["exchange"],
                     "market_cap": technicals["market_cap"],
@@ -1209,6 +1212,7 @@ def localize_diagnostics(df: pd.DataFrame, lang: str) -> pd.DataFrame:
                 localized[column] = localized[column].map(lambda value: DIAGNOSTIC_VALUE_TRANSLATIONS_HE.get(str(value), value))
         column_names = {
             "ticker": tr(lang, "diag_ticker"),
+            "current_price": tr(lang, "diag_price"),
             "status": tr(lang, "diag_status"),
             "exchange": tr(lang, "diag_exchange"),
             "market_cap": tr(lang, "diag_market_cap"),
@@ -1230,7 +1234,7 @@ def render_diagnostics_table(diagnostics: pd.DataFrame, lang: str) -> None:
 
     display_df = localize_diagnostics(diagnostics, lang)
     headers = ["", *display_df.columns.tolist()]
-    column_widths = [0.35, 0.8, 0.8, 0.8, 1.15, 0.85, 1.25, 0.85, 1.25, 1.0, 2.3]
+    column_widths = [0.35, 0.8, 0.9, 0.8, 0.8, 1.15, 0.85, 1.25, 0.85, 1.25, 1.0, 2.3]
     header_cols = st.columns(column_widths[: len(headers)])
     for col, header in zip(header_cols, headers):
         col.caption(header)
@@ -1255,8 +1259,10 @@ def render_diagnostics_table(diagnostics: pd.DataFrame, lang: str) -> None:
                 st.session_state.diagnostics_open = True
                 add_to_watchlist(original_ticker, "Added from diagnostics", lang)
                 st.rerun()
-            for col, value in zip(cols[1:], row.tolist()):
-                if isinstance(value, (float, np.floating)):
+            for col, (column_name, value) in zip(cols[1:], row.items()):
+                if column_name == tr(lang, "diag_price") and isinstance(value, (float, np.floating, int, np.integer)):
+                    col.write(f"${float(value):,.2f}")
+                elif isinstance(value, (float, np.floating)):
                     col.write(f"{value:.2f}")
                 elif isinstance(value, (bool, np.bool_)):
                     col.write("כן" if lang == "he" and value else "Yes" if value else "לא" if lang == "he" else "No")
