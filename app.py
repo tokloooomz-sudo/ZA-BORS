@@ -19,6 +19,7 @@ APP_NAME = "ZA-BORS"
 MIN_MARKET_CAP = 1_000_000_000
 MAJOR_EXCHANGES = {"NMS", "NYQ", "NGM", "NCM", "NASDAQ", "NYSE"}
 DEFAULT_UNIVERSE_PATH = "data/default_universe.csv"
+OPPORTUNITY_UNIVERSE_PATH = "data/opportunity_universe.csv"
 
 TRANSLATIONS = {
     "en": {
@@ -27,7 +28,10 @@ TRANSLATIONS = {
         "scan_settings": "Scan Settings",
         "universe": "Universe",
         "default_universe": "Default liquid US list",
+        "opportunity_universe": "High-upside watchlist: small caps, ADRs, Israel",
         "custom_tickers": "Custom tickers",
+        "min_market_cap": "Minimum market cap filter",
+        "min_market_cap_help": "Lower this to include small companies. $0 means no market-cap filter.",
         "max_tickers": "Max tickers to scan",
         "tickers": "Tickers",
         "news_items": "News items per ticker",
@@ -52,6 +56,7 @@ TRANSLATIONS = {
         "freshness": "Quote freshness depends on the data provider.",
         "candidates": "Professional Watch / Buy Candidates",
         "filters_caption": "Filters: NYSE/NASDAQ, market cap above $1B, positive catalyst, RSI below 45, price at least 10% below 52-week high, and advisor score above 65.",
+        "filters_caption_dynamic": "Filters: NYSE/NASDAQ, selected market-cap minimum, positive catalyst, RSI below 45, price at least 10% below 52-week high, and advisor score above 65.",
         "run_scan": "Run professional scan",
         "refresh_data": "Refresh market data",
         "cache_cleared": "Cached market/news data cleared. Run the scan again for fresh data.",
@@ -102,7 +107,7 @@ TRANSLATIONS = {
         "keyword_detected": "Keyword analysis detected a possible {catalyst}, so this should be reviewed manually before trading.",
         "no_catalyst_summary": "No catalyst summary returned.",
         "passed": "Passed all filters.",
-        "failed_blink": "Failed Blink filter: exchange or market cap.",
+        "failed_blink": "Failed tradeability filter: exchange or market cap.",
         "failed_catalyst": "No concrete positive catalyst.",
         "failed_technical": "Failed buy-low technical validation.",
         "strong": "Strong research candidate",
@@ -115,7 +120,10 @@ TRANSLATIONS = {
         "scan_settings": "הגדרות סריקה",
         "universe": "מאגר מניות",
         "default_universe": "רשימת מניות אמריקאיות נזילות",
+        "opportunity_universe": "רשימת הזדמנויות: קטנות, ADR וישראליות",
         "custom_tickers": "סימולים מותאמים אישית",
+        "min_market_cap": "סינון שווי שוק מינימלי",
+        "min_market_cap_help": "הורד את הרף כדי לכלול חברות קטנות. $0 מבטל את סינון שווי השוק.",
         "max_tickers": "מספר מניות מקסימלי לסריקה",
         "tickers": "סימולי מניות",
         "news_items": "מספר חדשות לכל מניה",
@@ -140,6 +148,7 @@ TRANSLATIONS = {
         "freshness": "רעננות המחירים תלויה בספק הנתונים.",
         "candidates": "מעקב מקצועי / מועמדות לקנייה",
         "filters_caption": "סינונים: NYSE/NASDAQ, שווי שוק מעל $1B, קטליזטור חיובי, RSI נמוך מ-45, מחיר לפחות 10% מתחת לשיא 52 שבועות, וציון יועץ מעל 65.",
+        "filters_caption_dynamic": "סינונים: NYSE/NASDAQ, רף שווי השוק שבחרת, קטליזטור חיובי, RSI נמוך מ-45, מחיר לפחות 10% מתחת לשיא 52 שבועות, וציון יועץ מעל 65.",
         "run_scan": "הפעל סריקה מקצועית",
         "refresh_data": "רענן נתוני שוק",
         "cache_cleared": "נתוני השוק והחדשות נוקו מהמטמון. הפעל סריקה מחדש לקבלת נתונים טריים.",
@@ -190,7 +199,7 @@ TRANSLATIONS = {
         "keyword_detected": "זיהוי לפי מילות מפתח מצא אפשרות לקטליזטור מסוג {catalyst}, ולכן יש לבדוק זאת ידנית לפני פעולה.",
         "no_catalyst_summary": "לא התקבל סיכום קטליזטור.",
         "passed": "עבר את כל הסינונים.",
-        "failed_blink": "נכשל בסינון Blink: בורסה או שווי שוק.",
+        "failed_blink": "נכשל בסינון סחירות: בורסה או שווי שוק.",
         "failed_catalyst": "לא נמצא קטליזטור חיובי ממשי.",
         "failed_technical": "נכשל באימות הטכני של קנייה במחיר נמוך.",
         "strong": "מועמדת מחקר חזקה",
@@ -302,6 +311,7 @@ class AdvisorSettings:
     stop_loss_pct: float
     max_position_pct: float
     require_all_filters: bool
+    min_market_cap: float
 
 
 def page_setup() -> None:
@@ -393,6 +403,11 @@ def load_default_universe() -> pd.DataFrame:
     return pd.read_csv(DEFAULT_UNIVERSE_PATH)
 
 
+@st.cache_data(ttl=60 * 60)
+def load_opportunity_universe() -> pd.DataFrame:
+    return pd.read_csv(OPPORTUNITY_UNIVERSE_PATH)
+
+
 @st.cache_data(ttl=60 * 15)
 def fetch_market_snapshot(ticker: str, lookback_period: str = "1y") -> dict[str, Any]:
     stock = yf.Ticker(ticker)
@@ -429,7 +444,7 @@ def compute_rsi(close: pd.Series, period: int = 14) -> float:
     return float(rsi.iloc[-1])
 
 
-def technicals_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+def technicals_from_snapshot(snapshot: dict[str, Any], min_market_cap: float = MIN_MARKET_CAP) -> dict[str, Any]:
     history: pd.DataFrame = snapshot["history"]
     info: dict[str, Any] = snapshot["info"]
     fast_info: dict[str, Any] = snapshot.get("fast_info", {})
@@ -460,7 +475,7 @@ def technicals_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     distance_from_high = ((high_52w - current_price) / high_52w) * 100 if high_52w else 0
     volatility_30d = annualized_volatility(close.tail(31))
     exchange_ok = any(code in exchange for code in MAJOR_EXCHANGES)
-    market_cap_ok = bool(market_cap and market_cap >= MIN_MARKET_CAP)
+    market_cap_ok = bool((min_market_cap <= 0) or (market_cap and market_cap >= min_market_cap))
 
     return {
         "ticker": ticker,
@@ -719,7 +734,7 @@ def scan_tickers(
 
         try:
             snapshot = fetch_market_snapshot(ticker)
-            technicals = technicals_from_snapshot(snapshot)
+            technicals = technicals_from_snapshot(snapshot, advisor_settings.min_market_cap)
             if not technicals.get("valid"):
                 diagnostics.append({"ticker": ticker, "status": tr(lang, "skipped"), "reason": tr(lang, "no_history")})
                 continue
@@ -1033,16 +1048,35 @@ def localize_diagnostics(df: pd.DataFrame, lang: str) -> pd.DataFrame:
 def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
     st.sidebar.header(tr(lang, "scan_settings"))
     default_universe = load_default_universe()
-    universe_labels = [tr(lang, "default_universe"), tr(lang, "custom_tickers")]
+    opportunity_universe = load_opportunity_universe()
+    universe_labels = [tr(lang, "default_universe"), tr(lang, "opportunity_universe"), tr(lang, "custom_tickers")]
     universe_mode = st.sidebar.radio(tr(lang, "universe"), universe_labels, index=0)
 
     if universe_mode == tr(lang, "default_universe"):
         max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, len(default_universe), 15)
         tickers = default_universe["ticker"].head(max_count).tolist()
+    elif universe_mode == tr(lang, "opportunity_universe"):
+        max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, len(opportunity_universe), min(25, len(opportunity_universe)))
+        tickers = opportunity_universe["ticker"].head(max_count).tolist()
     else:
         raw = st.sidebar.text_area(tr(lang, "tickers"), value="AAPL, MSFT, NVDA, AMD, TSLA")
         tickers = [item.strip().upper() for item in raw.replace("\n", ",").split(",") if item.strip()]
 
+    market_cap_options = {
+        "No minimum / ללא מינימום": 0.0,
+        "$50M": 50_000_000.0,
+        "$100M": 100_000_000.0,
+        "$300M": 300_000_000.0,
+        "$1B": 1_000_000_000.0,
+    }
+    default_cap_index = 4 if universe_mode == tr(lang, "default_universe") else 1
+    market_cap_label = st.sidebar.selectbox(
+        tr(lang, "min_market_cap"),
+        list(market_cap_options),
+        index=default_cap_index,
+        help=tr(lang, "min_market_cap_help"),
+    )
+    min_market_cap = market_cap_options[market_cap_label]
     max_news_items = st.sidebar.slider(tr(lang, "news_items"), 2, 10, 5)
     st.sidebar.divider()
     st.sidebar.header(tr(lang, "advisor_mode"))
@@ -1072,6 +1106,7 @@ def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
         stop_loss_pct=float(stop_loss_pct),
         max_position_pct=float(max_position_pct),
         require_all_filters=bool(require_all_filters),
+        min_market_cap=float(min_market_cap),
     )
 
 
@@ -1096,7 +1131,7 @@ def main() -> None:
 
     st.divider()
     st.subheader(tr(lang, "candidates"))
-    st.caption(tr(lang, "filters_caption"))
+    st.caption(tr(lang, "filters_caption_dynamic"))
 
     col_scan, col_clear = st.columns([2, 1])
     run_scan = col_scan.button(tr(lang, "run_scan"), type="primary")

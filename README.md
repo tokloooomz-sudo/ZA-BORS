@@ -9,7 +9,8 @@ Personal Streamlit dashboard for professional-style US stock research and "buy l
 - Scans a configurable US stock universe.
 - Applies the "Blink Filter":
   - NYSE/NASDAQ only.
-  - Market cap above $1B.
+  - Configurable market-cap floor, from no minimum to $1B.
+- Includes a high-upside universe with FUTU, selected small caps, ADRs, and Israeli companies listed in the US.
 - Fetches recent news through NewsAPI when available, otherwise Google News RSS.
 - Uses OpenAI sentiment/catalyst analysis when `OPENAI_API_KEY` is available.
 - Falls back to a conservative keyword catalyst detector when no LLM key is configured.
@@ -41,7 +42,7 @@ The sidebar includes risk controls:
 
 The app will only mark a candidate as actionable when it passes:
 
-- Blink filter: NYSE/NASDAQ and market cap above $1B.
+- Tradeability filter: NYSE/NASDAQ and your selected market-cap floor.
 - Catalyst filter: concrete positive catalyst.
 - Technical filter: RSI below 45 and at least 10% below the 52-week high.
 - Advisor score: 65 or higher.
