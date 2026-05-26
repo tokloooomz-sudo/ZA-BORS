@@ -20,6 +20,164 @@ MIN_MARKET_CAP = 1_000_000_000
 MAJOR_EXCHANGES = {"NMS", "NYQ", "NGM", "NCM", "NASDAQ", "NYSE"}
 DEFAULT_UNIVERSE_PATH = "data/default_universe.csv"
 
+TRANSLATIONS = {
+    "en": {
+        "app_title": "ZA-BORS Professional Stock Research",
+        "language": "Language",
+        "scan_settings": "Scan Settings",
+        "universe": "Universe",
+        "default_universe": "Default liquid US list",
+        "custom_tickers": "Custom tickers",
+        "max_tickers": "Max tickers to scan",
+        "tickers": "Tickers",
+        "news_items": "News items per ticker",
+        "advisor_mode": "Advisor Mode",
+        "risk_profile": "Risk profile",
+        "balanced": "Balanced",
+        "conservative": "Conservative",
+        "aggressive": "Aggressive",
+        "account_size": "Account size for sizing ($)",
+        "max_risk": "Max risk per trade (%)",
+        "stop_loss_pct": "Default stop-loss (%)",
+        "max_allocation": "Max allocation per stock (%)",
+        "only_professional": "Show only professional-grade signals",
+        "optional_secrets": "Optional secrets: OPENAI_API_KEY, OPENAI_MODEL, NEWSAPI_KEY.",
+        "fallback_news": "Without keys, the app uses Google News RSS plus keyword catalyst detection.",
+        "real_time_note": "For true real-time quotes, connect a paid market-data provider later. yfinance may be delayed.",
+        "risk_note": "Professional-style research assistant only. It is not a licensed investment advisor, and signals must be reviewed manually before any trade.",
+        "market_trend": "Market trend",
+        "benchmark_avg": "1M benchmark avg",
+        "scan_universe": "Scan universe",
+        "last_refresh": "Last dashboard refresh",
+        "freshness": "Quote freshness depends on the data provider.",
+        "candidates": "Professional Watch / Buy Candidates",
+        "filters_caption": "Filters: NYSE/NASDAQ, market cap above $1B, positive catalyst, RSI below 45, price at least 10% below 52-week high, and advisor score above 65.",
+        "run_scan": "Run professional scan",
+        "refresh_data": "Refresh market data",
+        "cache_cleared": "Cached market/news data cleared. Run the scan again for fresh data.",
+        "no_signals": "No active buy signals yet. Run a scan or widen the custom universe.",
+        "diagnostics": "Diagnostics / filtered tickers",
+        "diagnostics_wait": "Diagnostics will appear after the first scan.",
+        "watchlist": "My Watchlist",
+        "notes": "Notes",
+        "notes_placeholder": "Why are you watching it?",
+        "add_watchlist": "Add to watchlist",
+        "starting_scan": "Starting scan...",
+        "scanning": "Scanning",
+        "advisor_view": "Advisor View",
+        "score": "Score",
+        "profile": "Profile",
+        "catalyst": "The Catalyst",
+        "below_high": "Below 52W high",
+        "market_cap": "Market cap",
+        "volatility": "30D volatility",
+        "action_plan": "Professional Action Plan",
+        "entry_zone": "entry zone near",
+        "stop_loss": "stop-loss",
+        "take_profit": "20% take-profit target",
+        "risk_reward": "estimated risk/reward",
+        "position_sizing": "Position Sizing",
+        "suggested": "suggested",
+        "shares": "shares",
+        "position_value": "position value",
+        "at_risk": "at risk",
+        "news": "News",
+        "strong": "Strong research candidate",
+        "watch": "Watch closely",
+        "avoid": "Do not chase",
+    },
+    "he": {
+        "app_title": "ZA-BORS מחקר מניות מקצועי",
+        "language": "שפה",
+        "scan_settings": "הגדרות סריקה",
+        "universe": "מאגר מניות",
+        "default_universe": "רשימת מניות אמריקאיות נזילות",
+        "custom_tickers": "סימולים מותאמים אישית",
+        "max_tickers": "מספר מניות מקסימלי לסריקה",
+        "tickers": "סימולי מניות",
+        "news_items": "מספר חדשות לכל מניה",
+        "advisor_mode": "מצב יועץ",
+        "risk_profile": "פרופיל סיכון",
+        "balanced": "מאוזן",
+        "conservative": "שמרני",
+        "aggressive": "אגרסיבי",
+        "account_size": "גודל תיק לחישוב פוזיציה ($)",
+        "max_risk": "סיכון מקסימלי לעסקה (%)",
+        "stop_loss_pct": "סטופ-לוס ברירת מחדל (%)",
+        "max_allocation": "הקצאה מקסימלית למניה (%)",
+        "only_professional": "הצג רק איתותים ברמה מקצועית",
+        "optional_secrets": "מפתחות אופציונליים: OPENAI_API_KEY, OPENAI_MODEL, NEWSAPI_KEY.",
+        "fallback_news": "ללא מפתחות, האפליקציה משתמשת ב-Google News RSS ובזיהוי קטליזטורים לפי מילות מפתח.",
+        "real_time_note": "לציטוטים בזמן אמת מלא יש לחבר ספק נתוני שוק בתשלום. yfinance עשוי להיות מעוכב.",
+        "risk_note": "זהו עוזר מחקר בסגנון מקצועי בלבד. הוא אינו יועץ השקעות מורשה, וכל איתות דורש בדיקה ידנית לפני פעולה.",
+        "market_trend": "מגמת שוק",
+        "benchmark_avg": "ממוצע מדדים לחודש",
+        "scan_universe": "מניות בסריקה",
+        "last_refresh": "עדכון אחרון",
+        "freshness": "רעננות המחירים תלויה בספק הנתונים.",
+        "candidates": "מעקב מקצועי / מועמדות לקנייה",
+        "filters_caption": "סינונים: NYSE/NASDAQ, שווי שוק מעל $1B, קטליזטור חיובי, RSI נמוך מ-45, מחיר לפחות 10% מתחת לשיא 52 שבועות, וציון יועץ מעל 65.",
+        "run_scan": "הפעל סריקה מקצועית",
+        "refresh_data": "רענן נתוני שוק",
+        "cache_cleared": "נתוני השוק והחדשות נוקו מהמטמון. הפעל סריקה מחדש לקבלת נתונים טריים.",
+        "no_signals": "אין כרגע איתותי קנייה פעילים. הפעל סריקה או הרחב את מאגר המניות.",
+        "diagnostics": "אבחון / מניות שסוננו",
+        "diagnostics_wait": "האבחון יופיע לאחר הסריקה הראשונה.",
+        "watchlist": "רשימת מעקב אישית",
+        "notes": "הערות",
+        "notes_placeholder": "למה אתה עוקב אחריה?",
+        "add_watchlist": "הוסף לרשימת מעקב",
+        "starting_scan": "מתחיל סריקה...",
+        "scanning": "סורק",
+        "advisor_view": "מבט יועץ",
+        "score": "ציון",
+        "profile": "פרופיל",
+        "catalyst": "הקטליזטור",
+        "below_high": "מתחת לשיא 52 שבועות",
+        "market_cap": "שווי שוק",
+        "volatility": "תנודתיות 30 יום",
+        "action_plan": "תוכנית פעולה מקצועית",
+        "entry_zone": "אזור כניסה סביב",
+        "stop_loss": "סטופ-לוס",
+        "take_profit": "יעד רווח 20%",
+        "risk_reward": "יחס סיכון/סיכוי משוער",
+        "position_sizing": "גודל פוזיציה",
+        "suggested": "מוצע",
+        "shares": "מניות",
+        "position_value": "שווי פוזיציה",
+        "at_risk": "בסיכון",
+        "news": "חדשה",
+        "strong": "מועמדת מחקר חזקה",
+        "watch": "לעקוב מקרוב",
+        "avoid": "לא לרדוף אחרי המחיר",
+    },
+}
+
+PROFILE_TO_KEY = {
+    "Balanced": "balanced",
+    "Conservative": "conservative",
+    "Aggressive": "aggressive",
+}
+
+VERDICT_TO_KEY = {
+    "Strong research candidate": "strong",
+    "Watch closely": "watch",
+    "Do not chase": "avoid",
+}
+
+RISK_TRANSLATIONS_HE = {
+    "Catalyst confidence is not high enough for blind execution.": "רמת הביטחון בקטליזטור אינה גבוהה מספיק לפעולה אוטומטית.",
+    "High short-term volatility; position size should be reduced.": "תנודתיות קצרה גבוהה; מומלץ להקטין גודל פוזיציה.",
+    "High beta; stock may move harder than the market.": "Beta גבוה; המניה עשויה לנוע חזק יותר מהשוק.",
+    "RSI filter did not pass.": "סינון RSI לא עבר.",
+    "Price is not far enough below its 52-week high.": "המחיר אינו רחוק מספיק משיא 52 השבועות.",
+    "Main risks are execution timing, news reversal, and broad market weakness.": "הסיכונים המרכזיים הם תזמון ביצוע, היפוך חדשות וחולשה כללית בשוק.",
+}
+
+
+def tr(lang: str, key: str) -> str:
+    return TRANSLATIONS.get(lang, TRANSLATIONS["en"]).get(key, TRANSLATIONS["en"].get(key, key))
+
 
 @dataclass
 class CatalystResult:
@@ -94,6 +252,29 @@ def page_setup() -> None:
         .risk-list {
             color: #5b6672;
             margin-top: 6px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def apply_language_css(lang: str) -> None:
+    if lang != "he":
+        return
+    st.markdown(
+        """
+        <style>
+        .stApp, .stSidebar, .signal-card, .risk-note, .advisor-verdict {
+            direction: rtl;
+            text-align: right;
+        }
+        .ticker-line {
+            flex-direction: row-reverse;
+        }
+        .advisor-verdict {
+            border-right: 0;
+            border-left: 4px solid #0f766e;
         }
         </style>
         """,
@@ -409,14 +590,15 @@ def scan_tickers(
     tickers: list[str],
     max_news_items: int,
     advisor_settings: AdvisorSettings,
+    lang: str,
 ) -> tuple[list[dict[str, Any]], pd.DataFrame]:
     signals: list[dict[str, Any]] = []
     diagnostics: list[dict[str, Any]] = []
-    progress = st.progress(0, text="Starting scan...")
+    progress = st.progress(0, text=tr(lang, "starting_scan"))
 
     for index, ticker in enumerate(tickers, start=1):
         ticker = ticker.strip().upper()
-        progress.progress(index / len(tickers), text=f"Scanning {ticker} ({index}/{len(tickers)})")
+        progress.progress(index / len(tickers), text=f"{tr(lang, 'scanning')} {ticker} ({index}/{len(tickers)})")
 
         try:
             snapshot = fetch_market_snapshot(ticker)
@@ -571,7 +753,7 @@ def market_trend(tickers: list[str]) -> dict[str, Any]:
     return {"label": label, "avg_change": avg_change, "benchmarks": rows, "scanned": len(tickers)}
 
 
-def render_signal_card(signal: dict[str, Any]) -> None:
+def render_signal_card(signal: dict[str, Any], lang: str) -> None:
     catalyst: CatalystResult = signal["catalyst"]
     advisor: dict[str, Any] = signal["advisor"]
     rsi = signal["rsi_14"]
@@ -581,12 +763,14 @@ def render_signal_card(signal: dict[str, Any]) -> None:
     beta = signal.get("beta")
     rsi_badge = "OK" if signal["rsi_ok"] else "!"
     dip_badge = "OK" if signal["dip_ok"] else "!"
-    risk_items = "".join(f"<li>{risk}</li>" for risk in advisor["risks"])
+    risk_items = "".join(f"<li>{translate_risk(risk, lang)}</li>" for risk in advisor["risks"])
     news_links = " ".join(
-        f'<a href="{item["url"]}" target="_blank">News {idx}</a>'
+        f'<a href="{item["url"]}" target="_blank">{tr(lang, "news")} {idx}</a>'
         for idx, item in enumerate(signal["news"][:3], start=1)
         if item.get("url")
     )
+    verdict = tr(lang, VERDICT_TO_KEY.get(advisor["verdict"], advisor["verdict"]))
+    profile = tr(lang, PROFILE_TO_KEY.get(advisor["profile"], advisor["profile"]))
 
     st.markdown(
         f"""
@@ -596,26 +780,32 @@ def render_signal_card(signal: dict[str, Any]) -> None:
                 <div class="price-text">${signal["current_price"]:.2f}</div>
             </div>
             <div class="advisor-verdict">
-                <strong>Advisor View:</strong> {advisor["verdict"]} | Score {advisor["score"]}/100 | Profile: {advisor["profile"]}
+                <strong>{tr(lang, "advisor_view")}:</strong> {verdict} | {tr(lang, "score")} {advisor["score"]}/100 | {tr(lang, "profile")}: {profile}
             </div>
-            <p><strong>The Catalyst:</strong> {catalyst.summary}</p>
+            <p><strong>{tr(lang, "catalyst")}:</strong> {catalyst.summary}</p>
             <span class="pill">RSI 14D: {rsi:.1f} {rsi_badge}</span>
-            <span class="pill">Below 52W high: {distance:.1f}% {dip_badge}</span>
-            <span class="pill">Market cap: ${market_cap_b:.1f}B</span>
-            <span class="pill">30D volatility: {format_optional_pct(volatility)}</span>
+            <span class="pill">{tr(lang, "below_high")}: {distance:.1f}% {dip_badge}</span>
+            <span class="pill">{tr(lang, "market_cap")}: ${market_cap_b:.1f}B</span>
+            <span class="pill">{tr(lang, "volatility")}: {format_optional_pct(volatility)}</span>
             <span class="pill">Beta: {format_optional_number(beta)}</span>
-            <span class="pill">Catalyst: {catalyst.catalyst_type}</span>
-            <p><strong>Professional Action Plan:</strong> entry zone near ${signal["entry_price"]:.2f};
-            stop-loss ${advisor["stop_loss"]:.2f}; 20% take-profit target ${advisor["take_profit"]:.2f};
-            estimated risk/reward {advisor["risk_reward"]:.2f}:1.</p>
-            <p><strong>Position Sizing:</strong> suggested {advisor["suggested_shares"]} shares,
-            about ${advisor["suggested_position_value"]:.0f} position value, with about ${advisor["dollars_at_risk"]:.0f} at risk.</p>
+            <span class="pill">{tr(lang, "catalyst")}: {catalyst.catalyst_type}</span>
+            <p><strong>{tr(lang, "action_plan")}:</strong> {tr(lang, "entry_zone")} ${signal["entry_price"]:.2f};
+            {tr(lang, "stop_loss")} ${advisor["stop_loss"]:.2f}; {tr(lang, "take_profit")} ${advisor["take_profit"]:.2f};
+            {tr(lang, "risk_reward")} {advisor["risk_reward"]:.2f}:1.</p>
+            <p><strong>{tr(lang, "position_sizing")}:</strong> {tr(lang, "suggested")} {advisor["suggested_shares"]} {tr(lang, "shares")},
+            ${advisor["suggested_position_value"]:.0f} {tr(lang, "position_value")}, ${advisor["dollars_at_risk"]:.0f} {tr(lang, "at_risk")}.</p>
             <ul class="risk-list">{risk_items}</ul>
             <p>{news_links}</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+
+def translate_risk(risk: str, lang: str) -> str:
+    if lang == "he":
+        return RISK_TRANSLATIONS_HE.get(risk, risk)
+    return risk
 
 
 def format_optional_pct(value: Any) -> str:
@@ -638,16 +828,16 @@ def format_optional_number(value: Any) -> str:
     return "N/A"
 
 
-def render_watchlist() -> None:
-    st.subheader("My Watchlist")
+def render_watchlist(lang: str) -> None:
+    st.subheader(tr(lang, "watchlist"))
     if "watchlist" not in st.session_state:
         st.session_state.watchlist = pd.DataFrame(columns=["Ticker", "Notes", "Added"])
 
     with st.form("watchlist_form", clear_on_submit=True):
         col_a, col_b = st.columns([1, 3])
         ticker = col_a.text_input("Ticker", placeholder="AAPL").upper()
-        notes = col_b.text_input("Notes", placeholder="Why are you watching it?")
-        submitted = st.form_submit_button("Add to watchlist")
+        notes = col_b.text_input(tr(lang, "notes"), placeholder=tr(lang, "notes_placeholder"))
+        submitted = st.form_submit_button(tr(lang, "add_watchlist"))
 
     if submitted and ticker:
         new_row = pd.DataFrame(
@@ -658,37 +848,41 @@ def render_watchlist() -> None:
     st.data_editor(st.session_state.watchlist, use_container_width=True, num_rows="dynamic")
 
 
-def sidebar_controls() -> tuple[list[str], int, AdvisorSettings]:
-    st.sidebar.header("Scan Settings")
+def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
+    st.sidebar.header(tr(lang, "scan_settings"))
     default_universe = load_default_universe()
-    universe_mode = st.sidebar.radio("Universe", ["Default liquid US list", "Custom tickers"], index=0)
+    universe_labels = [tr(lang, "default_universe"), tr(lang, "custom_tickers")]
+    universe_mode = st.sidebar.radio(tr(lang, "universe"), universe_labels, index=0)
 
-    if universe_mode == "Default liquid US list":
-        max_count = st.sidebar.slider("Max tickers to scan", 5, len(default_universe), 15)
+    if universe_mode == tr(lang, "default_universe"):
+        max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, len(default_universe), 15)
         tickers = default_universe["ticker"].head(max_count).tolist()
     else:
-        raw = st.sidebar.text_area("Tickers", value="AAPL, MSFT, NVDA, AMD, TSLA")
+        raw = st.sidebar.text_area(tr(lang, "tickers"), value="AAPL, MSFT, NVDA, AMD, TSLA")
         tickers = [item.strip().upper() for item in raw.replace("\n", ",").split(",") if item.strip()]
 
-    max_news_items = st.sidebar.slider("News items per ticker", 2, 10, 5)
+    max_news_items = st.sidebar.slider(tr(lang, "news_items"), 2, 10, 5)
     st.sidebar.divider()
-    st.sidebar.header("Advisor Mode")
-    profile = st.sidebar.selectbox("Risk profile", ["Balanced", "Conservative", "Aggressive"], index=0)
+    st.sidebar.header(tr(lang, "advisor_mode"))
+    profile_options = ["Balanced", "Conservative", "Aggressive"]
+    profile_label_to_value = {tr(lang, PROFILE_TO_KEY[value]): value for value in profile_options}
+    profile_label = st.sidebar.selectbox(tr(lang, "risk_profile"), list(profile_label_to_value), index=0)
+    profile = profile_label_to_value[profile_label]
     defaults = {
         "Conservative": {"risk": 0.5, "stop": 8.0, "max_position": 10.0},
         "Balanced": {"risk": 1.0, "stop": 10.0, "max_position": 15.0},
         "Aggressive": {"risk": 1.5, "stop": 12.0, "max_position": 20.0},
     }[profile]
-    account_size = st.sidebar.number_input("Account size for sizing ($)", min_value=1000, value=10000, step=500)
-    risk_per_trade_pct = st.sidebar.slider("Max risk per trade (%)", 0.1, 3.0, defaults["risk"], 0.1)
-    stop_loss_pct = st.sidebar.slider("Default stop-loss (%)", 3.0, 20.0, defaults["stop"], 0.5)
-    max_position_pct = st.sidebar.slider("Max allocation per stock (%)", 2.0, 40.0, defaults["max_position"], 1.0)
-    require_all_filters = st.sidebar.toggle("Show only professional-grade signals", value=True)
+    account_size = st.sidebar.number_input(tr(lang, "account_size"), min_value=1000, value=10000, step=500)
+    risk_per_trade_pct = st.sidebar.slider(tr(lang, "max_risk"), 0.1, 3.0, defaults["risk"], 0.1)
+    stop_loss_pct = st.sidebar.slider(tr(lang, "stop_loss_pct"), 3.0, 20.0, defaults["stop"], 0.5)
+    max_position_pct = st.sidebar.slider(tr(lang, "max_allocation"), 2.0, 40.0, defaults["max_position"], 1.0)
+    require_all_filters = st.sidebar.toggle(tr(lang, "only_professional"), value=True)
 
     st.sidebar.divider()
-    st.sidebar.caption("Optional secrets: OPENAI_API_KEY, OPENAI_MODEL, NEWSAPI_KEY.")
-    st.sidebar.caption("Without keys, the app uses Google News RSS plus keyword catalyst detection.")
-    st.sidebar.caption("For true real-time quotes, connect a paid market-data provider later. yfinance may be delayed.")
+    st.sidebar.caption(tr(lang, "optional_secrets"))
+    st.sidebar.caption(tr(lang, "fallback_news"))
+    st.sidebar.caption(tr(lang, "real_time_note"))
     return tickers, max_news_items, AdvisorSettings(
         profile=profile,
         account_size=float(account_size),
@@ -701,37 +895,41 @@ def sidebar_controls() -> tuple[list[str], int, AdvisorSettings]:
 
 def main() -> None:
     page_setup()
-    tickers, max_news_items, advisor_settings = sidebar_controls()
+    language_label = st.sidebar.radio("Language / שפה", ["English", "עברית"], horizontal=True)
+    lang = "he" if language_label == "עברית" else "en"
+    apply_language_css(lang)
+    tickers, max_news_items, advisor_settings = sidebar_controls(lang)
 
-    st.title("ZA-BORS Professional Stock Research")
+    st.title(tr(lang, "app_title"))
     st.markdown(
-        '<div class="risk-note">Professional-style research assistant only. It is not a licensed investment advisor, and signals must be reviewed manually before any trade.</div>',
+        f'<div class="risk-note">{tr(lang, "risk_note")}</div>',
         unsafe_allow_html=True,
     )
 
     trend = market_trend(tickers)
     col_1, col_2, col_3 = st.columns(3)
-    col_1.metric("Market trend", trend["label"])
-    col_2.metric("1M benchmark avg", f"{trend['avg_change']:.2f}%")
-    col_3.metric("Scan universe", f"{trend['scanned']} tickers")
-    st.caption(f"Last dashboard refresh: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}. Quote freshness depends on the data provider.")
+    col_1.metric(tr(lang, "market_trend"), trend["label"])
+    col_2.metric(tr(lang, "benchmark_avg"), f"{trend['avg_change']:.2f}%")
+    col_3.metric(tr(lang, "scan_universe"), f"{trend['scanned']}")
+    st.caption(f"{tr(lang, 'last_refresh')}: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}. {tr(lang, 'freshness')}")
 
     st.divider()
-    st.subheader("Professional Watch / Buy Candidates")
-    st.caption("Filters: NYSE/NASDAQ, market cap above $1B, positive catalyst, RSI below 45, price at least 10% below 52-week high, and advisor score above 65.")
+    st.subheader(tr(lang, "candidates"))
+    st.caption(tr(lang, "filters_caption"))
 
     col_scan, col_clear = st.columns([2, 1])
-    run_scan = col_scan.button("Run professional scan", type="primary")
-    clear_cache = col_clear.button("Refresh market data")
+    run_scan = col_scan.button(tr(lang, "run_scan"), type="primary")
+    clear_cache = col_clear.button(tr(lang, "refresh_data"))
     if clear_cache:
         st.cache_data.clear()
-        st.success("Cached market/news data cleared. Run the scan again for fresh data.")
+        st.success(tr(lang, "cache_cleared"))
 
     if run_scan:
         signals, diagnostics = scan_tickers(
             tickers,
             max_news_items=max_news_items,
             advisor_settings=advisor_settings,
+            lang=lang,
         )
         st.session_state["signals"] = signals
         st.session_state["diagnostics"] = diagnostics
@@ -741,18 +939,18 @@ def main() -> None:
 
     if signals:
         for signal in signals:
-            render_signal_card(signal)
+            render_signal_card(signal, lang)
     else:
-        st.info("No active buy signals yet. Run a scan or widen the custom universe.")
+        st.info(tr(lang, "no_signals"))
 
-    with st.expander("Diagnostics / filtered tickers", expanded=False):
+    with st.expander(tr(lang, "diagnostics"), expanded=False):
         if isinstance(diagnostics, pd.DataFrame) and not diagnostics.empty:
             st.dataframe(diagnostics, use_container_width=True)
         else:
-            st.caption("Diagnostics will appear after the first scan.")
+            st.caption(tr(lang, "diagnostics_wait"))
 
     st.divider()
-    render_watchlist()
+    render_watchlist(lang)
 
 
 if __name__ == "__main__":
