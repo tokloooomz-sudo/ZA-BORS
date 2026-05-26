@@ -1,0 +1,44 @@
+[
+  {
+    "title": "משרד שקט ליד תחנת סבידור",
+    "address": "מנחם בגין, מתחם הבורסה",
+    "monthlyRent": 7800,
+    "sqm": 52,
+    "walkToTrain": 6,
+    "floor": 12,
+    "parking": 1,
+    "availableFrom": "2026-06-01",
+    "contractMonths": 12,
+    "conditionScore": 82,
+    "fitScore": 88,
+    "notes": "מחולק טוב, מתאים לצוות קטן, מעליות מהירות."
+  },
+  {
+    "title": "חלל פתוח עם נוף עירוני",
+    "address": "ז'בוטינסקי, רמת גן",
+    "monthlyRent": 11200,
+    "sqm": 85,
+    "walkToTrain": 9,
+    "floor": 18,
+    "parking": 2,
+    "availableFrom": "2026-07-15",
+    "contractMonths": 24,
+    "conditionScore": 91,
+    "fitScore": 79,
+    "notes": "מרשים ללקוחות, פחות אינטימי לפגישות."
+  },
+  {
+    "title": "קליניקה/משרד קטן במחיר נמוך",
+    "address": "תובל, מתחם הבורסה",
+    "monthlyRent": 5200,
+    "sqm": 31,
+    "walkToTrain": 4,
+    "floor": 5,
+    "parking": 0,
+    "availableFrom": "2026-05-30",
+    "contractMonths": 6,
+    "conditionScore": 70,
+    "fitScore": 76,
+    "notes": "חסכוני וגמיש, דורש קצת שיפוץ."
+  }
+]
