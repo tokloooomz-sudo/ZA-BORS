@@ -1,111 +1,66 @@
 # ZA-BORS
 
-Personal Streamlit dashboard for professional-style US stock research and "buy low, sell high" signal discovery.
+ZA-BORS is now a normal web app, not a Streamlit-only app.
 
-> This is a professional-style research assistant only. It is not a licensed investment advisor and it is not financial advice.
+It scans a BLINK-focused US stock universe, shows advisor verdicts, lets you add stocks to a persistent watchlist, displays live-ish quotes, and tracks bought positions with sell alerts.
 
-## What It Does
+> Research tool only. This is not financial advice.
 
-- Scans a configurable US stock universe.
-- Applies the "Blink Filter":
-  - NYSE/NASDAQ only.
-  - Configurable market-cap floor, from no minimum to $1B.
-- Includes a high-upside universe with FUTU, selected small caps, ADRs, and Israeli companies listed in the US.
-- Includes a Blink working universe in `data/blink_universe.csv` for tickers the user wants to scan through the Blink workflow.
-- Blink is the default scan universe and can scan up to 100 tickers.
-- Fetches recent news through NewsAPI when available, otherwise Google News RSS.
-- Uses OpenAI sentiment/catalyst analysis when `OPENAI_API_KEY` is available.
-- Falls back to a conservative keyword catalyst detector when no LLM key is configured.
-- Validates "buy low" technicals:
-  - 14-day RSI below 45.
-  - Current price at least 10% below the 52-week high.
-- Shows clean Streamlit cards with:
-  - ticker and price,
-  - catalyst summary,
-  - RSI and dip checklist,
-  - advisor score and verdict,
-  - proposed entry, stop-loss, and 20% take-profit target,
-  - estimated risk/reward,
-  - suggested position size based on account size and risk settings,
-  - key risk flags.
-- Includes a simple manual watchlist.
-- Watchlist entries are added through a simple ticker form and can be removed from the page.
-- Watchlist quotes show price, daily change, green/red direction arrows, and can auto-refresh while the app is open.
-- Diagnostics rows include the latest price captured during the scan.
-- Price text is colored green when up, red when down, and yellow/orange when unchanged.
-- Advisor verdicts are color-coded: green for strong, yellow/orange for watch, red for avoid.
-- Diagnostics are sorted by advisor verdict: strong first, watch next, avoid last.
-- Supports English and Hebrew UI with right-to-left layout in Hebrew.
-
-## Professional Advisor Mode
-
-The sidebar includes risk controls:
-
-- Risk profile: Conservative, Balanced, or Aggressive.
-- Minimum and maximum investment amount per stock.
-- Maximum risk per trade.
-- Default stop-loss percentage.
-- Option to show only professional-grade signals.
-
-The app will only mark a candidate as actionable when it passes:
-
-- Tradeability filter: NYSE/NASDAQ and your selected market-cap floor.
-- Catalyst filter: concrete positive catalyst.
-- Technical filter: RSI below 45 and at least 10% below the 52-week high.
-- Advisor score: 65 or higher.
-
-## Real-Time Data
-
-The current implementation uses `yfinance`, which may be delayed or incomplete. For true professional real-time use, connect a dedicated market-data provider such as a paid quote/news API, then replace the `fetch_market_snapshot` and `fetch_news` functions.
-
-Recommended future upgrade path:
-
-1. Add a real-time quote provider.
-2. Add authenticated broker availability checks for Blink or the broker you use.
-3. Add portfolio holdings and exposure limits.
-4. Add alerting by SMS, WhatsApp, email, or push notifications.
-5. Add audit logs so every signal records the data used at decision time.
-
-## Local Setup
+## Run Locally
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-streamlit run app.py
+uvicorn web_app:app --host 127.0.0.1 --port 8000
 ```
 
-If `python` is not installed on this Windows machine, install Python 3.11+ first.
+Open:
 
-## Optional API Keys
-
-Create `.streamlit/secrets.toml`:
-
-```toml
-OPENAI_API_KEY = "your_openai_key"
-OPENAI_MODEL = "gpt-5.2"
-NEWSAPI_KEY = "your_newsapi_key"
+```text
+http://127.0.0.1:8000
 ```
 
-You can also set these as environment variables.
+## Main Files
 
-## Use On Your Phone
+- `web_app.py` - FastAPI backend
+- `templates/index.html` - web page
+- `static/app.js` - browser logic
+- `static/styles.css` - web styling
+- `data/blink_universe.csv` - BLINK working stock universe
+- `data/watchlist.json` - local personal watchlist, ignored by Git
 
-The app is mobile-friendly in the browser. For phone access, deploy it online:
+## Features
 
-1. Push this repository to GitHub.
-2. Create a free Streamlit Community Cloud app.
-3. Select this repo and set `app.py` as the entry file.
-4. Add the secrets above in the Streamlit Cloud secrets manager.
-5. Open the deployed URL on your phone and add it to your home screen.
+- Scan up to 100 BLINK-watchlist tickers.
+- Sort advisor decisions by:
+  - כדאי מאוד
+  - כדאי לעקוב
+  - לא כדאי עכשיו
+- Color advisor verdicts.
+- Color stock prices green/red/yellow by daily movement.
+- Add stocks with `+`.
+- Remove stocks with `-`.
+- Persistent watchlist.
+- Mark a stock with `V` when actually bought.
+- Enter buy price.
+- Show live profit/loss.
+- Sell alerts when:
+  - SPY drops more than 10% from its recent high.
+  - A bought stock gains more than 50% from buy price.
+
+## Deploy As A Website
+
+This app needs a Python server, so GitHub Pages will not run it directly.
+
+Use Render, Railway, Fly.io, or another Python web host.
+
+Start command:
+
+```text
+uvicorn web_app:app --host 0.0.0.0 --port $PORT
+```
 
 ## Notes
 
-- `yfinance` data can be delayed or incomplete.
-- News and LLM sentiment are inputs for research, not trading instructions.
-- Always confirm that a ticker is available in your actual broker app before placing an order.
-- The Blink universe is an editable working list, not an official complete list from Blink.
-- Watchlist quote refresh uses the configured data provider. `yfinance` is not guaranteed to be real-time; connect a paid market-data API for professional real-time prices.
-- Watchlist entries are persisted in `data/watchlist.json` until removed with the minus button.
-- Watchlist sell alerts warn when SPY drops more than 10% from its recent high or a watched stock gains 50% above its saved buy price.
-- Watchlist entries can be marked as actually bought with a checkbox, which enables live profit/loss indication against the saved buy price.
+- `yfinance` can be delayed or incomplete.
+- For true trading-grade real-time prices, connect a paid market-data API.
+- `data/watchlist.json` is ignored by Git so personal watchlists are not pushed publicly.

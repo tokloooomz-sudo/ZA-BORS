@@ -1,0 +1,121 @@
+:root {
+  --bg: #f5faf9;
+  --panel: #ffffff;
+  --line: #d8e3e0;
+  --text: #17212b;
+  --muted: #61717d;
+  --green: #15803d;
+  --red: #b91c1c;
+  --yellow: #b45309;
+  --teal: #0f766e;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, "Segoe UI", sans-serif;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: 100vh;
+}
+.sidebar {
+  border-left: 1px solid var(--line);
+  background: #eef7f5;
+  padding: 22px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+h1, h2 { margin: 0 0 12px; }
+p, span { color: var(--muted); }
+label {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+  font-weight: 700;
+  color: var(--muted);
+}
+input, select, button {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  background: #fff;
+  font-weight: 800;
+}
+.primary {
+  background: var(--teal);
+  color: white;
+  border-color: var(--teal);
+  width: 100%;
+}
+.content { padding: 24px; }
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0 0 10px;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 26px;
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  min-width: 1100px;
+  border-collapse: collapse;
+}
+th, td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px;
+  text-align: right;
+  vertical-align: middle;
+}
+th { color: var(--muted); font-size: 13px; }
+.verdict-strong { color: var(--green); font-weight: 900; }
+.verdict-watch { color: var(--yellow); font-weight: 900; }
+.verdict-avoid { color: var(--red); font-weight: 900; }
+.price-up { color: var(--green); font-weight: 900; }
+.price-down { color: var(--red); font-weight: 900; }
+.price-flat { color: var(--yellow); font-weight: 900; }
+.watch-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto 2fr auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.alert {
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  background: #fff7df;
+  border: 1px solid #f2c66d;
+  color: #5f3b00;
+}
+.watched {
+  background: #ffe4ef;
+}
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; border-left: 0; border-bottom: 1px solid var(--line); }
+  .watch-form { grid-template-columns: 1fr; }
+}
