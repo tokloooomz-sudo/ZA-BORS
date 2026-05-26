@@ -24,8 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 WATCHLIST_PATH = DATA_DIR / "watchlist.json"
 BLINK_UNIVERSE_PATH = DATA_DIR / "blink_universe.csv"
-SESSION_COOKIE = "za_bors_session"
-SESSION_MAX_AGE = 60 * 60 * 24 * 7
+SESSION_MAX_AGE = 60 * 60 * 12
 
 app = FastAPI(title="ZA-BORS")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -95,7 +94,9 @@ def require_login(request: Request) -> str:
     if not expected_username or not expected_password:
         return "local"
 
-    username = verify_session(request.cookies.get(SESSION_COOKIE))
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.removeprefix("Bearer ").strip() if auth_header.startswith("Bearer ") else ""
+    username = verify_session(token)
     if username:
         return username
 
@@ -106,21 +107,19 @@ def require_login(request: Request) -> str:
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request):
-    expected_username, expected_password = auth_settings()
-    if expected_username and expected_password and not verify_session(request.cookies.get(SESSION_COOKIE)):
-        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+def login_home():
+    template = templates.get_template("login.html")
+    return template.render(app_name="ZA-BORS", error="")
 
+
+@app.get("/app", response_class=HTMLResponse)
+def app_home():
     template = templates.get_template("index.html")
     return template.render(app_name="ZA-BORS")
 
 
 @app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request):
-    expected_username, expected_password = auth_settings()
-    if expected_username and expected_password and verify_session(request.cookies.get(SESSION_COOKIE)):
-        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
-
+def login_page():
     template = templates.get_template("login.html")
     return template.render(app_name="ZA-BORS", error="")
 
@@ -129,16 +128,7 @@ def login_page(request: Request):
 async def login(request: Request) -> JSONResponse:
     expected_username, expected_password = auth_settings()
     if not expected_username or not expected_password:
-        response = JSONResponse({"ok": True})
-        response.set_cookie(
-            SESSION_COOKIE,
-            sign_session("local"),
-            httponly=True,
-            secure=request.url.scheme == "https",
-            samesite="lax",
-            max_age=SESSION_MAX_AGE,
-        )
-        return response
+        return JSONResponse({"ok": True, "token": sign_session("local")})
 
     payload = await request.json()
     username = str(payload.get("username", ""))
@@ -148,23 +138,12 @@ async def login(request: Request) -> JSONResponse:
     if not username_ok or not password_ok:
         return JSONResponse({"ok": False, "message": "שם משתמש או סיסמה לא נכונים"}, status_code=401)
 
-    response = JSONResponse({"ok": True})
-    response.set_cookie(
-        SESSION_COOKIE,
-        sign_session(username),
-        httponly=True,
-        secure=request.url.scheme == "https",
-        samesite="lax",
-        max_age=SESSION_MAX_AGE,
-    )
-    return response
+    return JSONResponse({"ok": True, "token": sign_session(username)})
 
 
 @app.post("/api/logout")
 def logout() -> JSONResponse:
-    response = JSONResponse({"ok": True})
-    response.delete_cookie(SESSION_COOKIE)
-    return response
+    return JSONResponse({"ok": True})
 
 
 @app.get("/api/universe")

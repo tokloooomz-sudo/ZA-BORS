@@ -48,7 +48,9 @@
         });
 
         if (response.ok) {
-          window.location.href = "/";
+          const data = await response.json();
+          sessionStorage.setItem("zaBorsToken", data.token);
+          window.location.href = "/app";
           return;
         }
 

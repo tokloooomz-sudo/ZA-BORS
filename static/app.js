@@ -3,6 +3,12 @@ const signalsEl = document.querySelector("#signals");
 const watchlistEl = document.querySelector("#watchlist");
 const sellAlertsEl = document.querySelector("#sellAlerts");
 const loadingBar = document.querySelector("#loadingBar");
+const authToken = sessionStorage.getItem("zaBorsToken");
+
+if (!authToken) {
+  window.location.href = "/";
+  throw new Error("Login required");
+}
 
 document.querySelector("#scanButton").addEventListener("click", scan);
 document.querySelector("#refreshWatchlist").addEventListener("click", () => loadWatchlist(true));
@@ -184,17 +190,26 @@ async function withLoading(task) {
 }
 
 async function apiFetch(url, options) {
-  const response = await fetch(url, options);
+  const mergedOptions = {
+    ...(options || {}),
+    headers: {
+      ...((options && options.headers) || {}),
+      Authorization: `Bearer ${authToken}`
+    }
+  };
+  const response = await fetch(url, mergedOptions);
   if (response.status === 401) {
-    window.location.href = "/login";
+    sessionStorage.removeItem("zaBorsToken");
+    window.location.href = "/";
     throw new Error("Login required");
   }
   return response;
 }
 
 async function logout() {
+  sessionStorage.removeItem("zaBorsToken");
   await fetch("/api/logout", { method: "POST" });
-  window.location.href = "/login";
+  window.location.href = "/";
 }
 
 function startLoading() {
