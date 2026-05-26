@@ -534,6 +534,14 @@ def fetch_watchlist_quote(ticker: str) -> dict[str, Any]:
     }
 
 
+def quote_direction(price: float, previous_close: float) -> tuple[float, float]:
+    if not price or not previous_close:
+        return 0.0, 0.0
+    change = price - previous_close
+    change_pct = (change / previous_close) * 100
+    return change, change_pct
+
+
 def compute_rsi(close: pd.Series, period: int = 14) -> float:
     if close.empty or len(close) < period + 2:
         return float("nan")
@@ -567,6 +575,14 @@ def technicals_from_snapshot(snapshot: dict[str, Any], min_market_cap: float = M
         close.iloc[-1],
     )
     high_52w = first_number(info.get("fiftyTwoWeekHigh"), fast_info.get("year_high"), close.max())
+    previous_close = first_number(
+        fast_info.get("previous_close"),
+        info.get("regularMarketPreviousClose"),
+        info.get("previousClose"),
+    )
+    if not previous_close and len(close) >= 2:
+        previous_close = float(close.iloc[-2])
+    daily_change, daily_change_pct = quote_direction(current_price, previous_close)
     market_cap = info.get("marketCap")
     exchange = str(info.get("exchange") or info.get("fullExchangeName") or "").upper()
 
@@ -585,6 +601,9 @@ def technicals_from_snapshot(snapshot: dict[str, Any], min_market_cap: float = M
         "exchange": exchange or "Unknown",
         "market_cap": market_cap,
         "current_price": current_price,
+        "previous_close": previous_close,
+        "daily_change": daily_change,
+        "daily_change_pct": daily_change_pct,
         "high_52w": high_52w,
         "rsi_14": rsi_14,
         "distance_from_high": distance_from_high,
@@ -852,6 +871,8 @@ def scan_tickers(
                 {
                     "ticker": ticker,
                     "current_price": technicals["current_price"],
+                    "daily_change": technicals["daily_change"],
+                    "daily_change_pct": technicals["daily_change_pct"],
                     "status": tr(lang, "signal") if advisor["is_actionable"] else tr(lang, "filtered"),
                     "exchange": technicals["exchange"],
                     "market_cap": technicals["market_cap"],
@@ -1147,7 +1168,7 @@ def render_watchlist(lang: str, settings: AdvisorSettings) -> None:
         quote = fetch_watchlist_quote(row["Ticker"])
         col_ticker, col_price, col_change, col_notes, col_added, col_remove = st.columns([1, 1.1, 1.1, 3, 1.4, 0.5])
         col_ticker.markdown(f"**{row['Ticker']}**")
-        col_price.markdown(f"**{tr(lang, 'live_price')}:** {format_quote_price(quote)}")
+        col_price.markdown(f"**{tr(lang, 'live_price')}:** {format_quote_price(quote)}", unsafe_allow_html=True)
         col_change.markdown(format_quote_change(quote), unsafe_allow_html=True)
         col_notes.write(row.get("Notes") or "-")
         col_added.caption(f"{tr(lang, 'added')}: {row.get('Added', '-')}")
@@ -1161,7 +1182,7 @@ def format_quote_price(quote: dict[str, Any]) -> str:
     price = quote.get("price")
     if not price:
         return "N/A"
-    return f"${float(price):,.2f}"
+    return colored_price(float(price), float(quote.get("change") or 0), html=True)
 
 
 def format_quote_change(quote: dict[str, Any]) -> str:
@@ -1180,6 +1201,19 @@ def format_quote_change(quote: dict[str, Any]) -> str:
         f"<span style='color:{color};font-weight:800;font-size:1.05rem;'>"
         f"{arrow} ${change:,.2f} ({change_pct:.2f}%)</span>"
     )
+
+
+def colored_price(price: float, change: float, html: bool = False) -> str:
+    if change > 0:
+        color = "#15803d"
+    elif change < 0:
+        color = "#b91c1c"
+    else:
+        color = "#b45309"
+    text = f"${price:,.2f}"
+    if html:
+        return f"<span style='color:{color};font-weight:800;'>{text}</span>"
+    return text
 
 
 def ensure_watchlist() -> None:
@@ -1241,6 +1275,7 @@ def localize_diagnostics(df: pd.DataFrame, lang: str) -> pd.DataFrame:
             "reason": tr(lang, "diag_reason"),
         }
         localized = localized.rename(columns=column_names)
+    localized = localized.drop(columns=[column for column in ["daily_change", "daily_change_pct"] if column in localized.columns])
     return localized
 
 
@@ -1276,9 +1311,12 @@ def render_diagnostics_table(diagnostics: pd.DataFrame, lang: str) -> None:
                 st.session_state.diagnostics_open = True
                 add_to_watchlist(original_ticker, "Added from diagnostics", lang)
                 st.rerun()
+            original_row = diagnostics.iloc[index]
+            price_column = tr(lang, "diag_price")
             for col, (column_name, value) in zip(cols[1:], row.items()):
                 if column_name == tr(lang, "diag_price") and isinstance(value, (float, np.floating, int, np.integer)):
-                    col.write(f"${float(value):,.2f}")
+                    change = float(original_row.get("daily_change", 0) or 0)
+                    col.markdown(colored_price(float(value), change, html=True), unsafe_allow_html=True)
                 elif isinstance(value, (float, np.floating)):
                     col.write(f"{value:.2f}")
                 elif isinstance(value, (bool, np.bool_)):
