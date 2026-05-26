@@ -1086,6 +1086,12 @@ def remove_from_watchlist(ticker: str) -> None:
     st.session_state.watchlist = [row for row in st.session_state.watchlist if row["Ticker"] != ticker]
 
 
+def is_in_watchlist(ticker: str) -> bool:
+    ensure_watchlist()
+    ticker = ticker.upper().strip()
+    return any(row["Ticker"] == ticker for row in st.session_state.watchlist)
+
+
 def localize_diagnostics(df: pd.DataFrame, lang: str) -> pd.DataFrame:
     if df.empty:
         return df
@@ -1124,17 +1130,33 @@ def render_diagnostics_table(diagnostics: pd.DataFrame, lang: str) -> None:
 
     for index, (_, row) in enumerate(display_df.iterrows()):
         original_ticker = str(diagnostics.iloc[index]["ticker"]).upper()
-        cols = st.columns(column_widths[: len(headers)])
-        if cols[0].button(tr(lang, "add_symbol"), key=f"add_diag_{index}_{original_ticker}", help=tr(lang, "add_watchlist")):
-            add_to_watchlist(original_ticker, "Added from diagnostics", lang)
-            st.rerun()
-        for col, value in zip(cols[1:], row.tolist()):
-            if isinstance(value, (float, np.floating)):
-                col.write(f"{value:.2f}")
-            elif isinstance(value, (bool, np.bool_)):
-                col.write("כן" if lang == "he" and value else "Yes" if value else "לא" if lang == "he" else "No")
-            else:
-                col.write(value)
+        is_watched = is_in_watchlist(original_ticker)
+        row_container = st.container(border=is_watched)
+        if is_watched:
+            row_container.markdown(
+                "<div style='background:#ffe4ef;border-radius:8px;padding:4px 8px;margin-bottom:4px;'>",
+                unsafe_allow_html=True,
+            )
+        with row_container:
+            cols = st.columns(column_widths[: len(headers)])
+            if cols[0].button(
+                tr(lang, "add_symbol"),
+                key=f"add_diag_{index}_{original_ticker}",
+                help=tr(lang, "add_watchlist"),
+                disabled=is_watched,
+            ):
+                st.session_state.diagnostics_open = True
+                add_to_watchlist(original_ticker, "Added from diagnostics", lang)
+                st.rerun()
+            for col, value in zip(cols[1:], row.tolist()):
+                if isinstance(value, (float, np.floating)):
+                    col.write(f"{value:.2f}")
+                elif isinstance(value, (bool, np.bool_)):
+                    col.write("כן" if lang == "he" and value else "Yes" if value else "לא" if lang == "he" else "No")
+                else:
+                    col.write(value)
+        if is_watched:
+            row_container.markdown("</div>", unsafe_allow_html=True)
 
 
 def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
@@ -1243,6 +1265,7 @@ def main() -> None:
         st.success(tr(lang, "cache_cleared"))
 
     if run_scan:
+        st.session_state.diagnostics_open = True
         signals, diagnostics = scan_tickers(
             tickers,
             max_news_items=max_news_items,
@@ -1261,7 +1284,8 @@ def main() -> None:
     else:
         st.info(tr(lang, "no_signals"))
 
-    with st.expander(tr(lang, "diagnostics"), expanded=False):
+    diagnostics_expanded = bool(st.session_state.get("diagnostics_open", False))
+    with st.expander(tr(lang, "diagnostics"), expanded=diagnostics_expanded):
         if isinstance(diagnostics, pd.DataFrame) and not diagnostics.empty:
             render_diagnostics_table(diagnostics, lang)
         else:
