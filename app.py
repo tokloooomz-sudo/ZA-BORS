@@ -82,6 +82,29 @@ TRANSLATIONS = {
         "position_value": "position value",
         "at_risk": "at risk",
         "news": "News",
+        "no_history": "No price history returned by yfinance.",
+        "skipped": "Skipped",
+        "signal": "Signal",
+        "filtered": "Filtered",
+        "error": "Error",
+        "diag_ticker": "Ticker",
+        "diag_status": "Status",
+        "diag_exchange": "Exchange",
+        "diag_market_cap": "Market cap",
+        "diag_rsi": "RSI 14D",
+        "diag_distance": "Below 52W high",
+        "diag_score": "Advisor score",
+        "diag_verdict": "Verdict",
+        "diag_positive": "Positive catalyst",
+        "diag_reason": "Reason",
+        "no_news": "No recent news was found.",
+        "no_catalyst": "Recent headlines did not show a concrete positive-change catalyst. Add an OpenAI API key for stricter LLM analysis.",
+        "keyword_detected": "Keyword analysis detected a possible {catalyst}, so this should be reviewed manually before trading.",
+        "no_catalyst_summary": "No catalyst summary returned.",
+        "passed": "Passed all filters.",
+        "failed_blink": "Failed Blink filter: exchange or market cap.",
+        "failed_catalyst": "No concrete positive catalyst.",
+        "failed_technical": "Failed buy-low technical validation.",
         "strong": "Strong research candidate",
         "watch": "Watch closely",
         "avoid": "Do not chase",
@@ -147,6 +170,29 @@ TRANSLATIONS = {
         "position_value": "שווי פוזיציה",
         "at_risk": "בסיכון",
         "news": "חדשה",
+        "no_history": "לא התקבלו נתוני מחיר מ-yfinance.",
+        "skipped": "דולג",
+        "signal": "איתות",
+        "filtered": "סונן",
+        "error": "שגיאה",
+        "diag_ticker": "סימול",
+        "diag_status": "סטטוס",
+        "diag_exchange": "בורסה",
+        "diag_market_cap": "שווי שוק",
+        "diag_rsi": "RSI 14 יום",
+        "diag_distance": "מרחק משיא 52 שבועות",
+        "diag_score": "ציון יועץ",
+        "diag_verdict": "החלטת יועץ",
+        "diag_positive": "קטליזטור חיובי",
+        "diag_reason": "סיבה",
+        "no_news": "לא נמצאו חדשות עדכניות.",
+        "no_catalyst": "הכותרות האחרונות לא הראו קטליזטור חיובי ממשי. הוסף מפתח OpenAI לניתוח AI מדויק יותר.",
+        "keyword_detected": "זיהוי לפי מילות מפתח מצא אפשרות לקטליזטור מסוג {catalyst}, ולכן יש לבדוק זאת ידנית לפני פעולה.",
+        "no_catalyst_summary": "לא התקבל סיכום קטליזטור.",
+        "passed": "עבר את כל הסינונים.",
+        "failed_blink": "נכשל בסינון Blink: בורסה או שווי שוק.",
+        "failed_catalyst": "לא נמצא קטליזטור חיובי ממשי.",
+        "failed_technical": "נכשל באימות הטכני של קנייה במחיר נמוך.",
         "strong": "מועמדת מחקר חזקה",
         "watch": "לעקוב מקרוב",
         "avoid": "לא לרדוף אחרי המחיר",
@@ -172,6 +218,43 @@ RISK_TRANSLATIONS_HE = {
     "RSI filter did not pass.": "סינון RSI לא עבר.",
     "Price is not far enough below its 52-week high.": "המחיר אינו רחוק מספיק משיא 52 השבועות.",
     "Main risks are execution timing, news reversal, and broad market weakness.": "הסיכונים המרכזיים הם תזמון ביצוע, היפוך חדשות וחולשה כללית בשוק.",
+}
+
+CATALYST_TRANSLATIONS_HE = {
+    "earnings beat": "דוחות טובים מהצפוי",
+    "regulatory approval": "אישור רגולטורי",
+    "major contract": "חוזה משמעותי",
+    "strategic partnership": "שותפות אסטרטגית",
+    "breakthrough": "פריצת דרך",
+    "product launch": "השקת מוצר",
+    "market reaction": "תגובה חיובית בשוק",
+    "earnings": "דוחות",
+    "contract": "חוזה",
+    "approval": "אישור",
+    "guidance": "תחזית חברה",
+    "partnership": "שותפות",
+    "other": "אחר",
+    "none": "אין",
+}
+
+MARKET_LABELS_HE = {
+    "Risk-on": "נטייה חיובית",
+    "Risk-off": "נטייה שלילית",
+    "Mixed / neutral": "מעורב / ניטרלי",
+}
+
+DIAGNOSTIC_VALUE_TRANSLATIONS_HE = {
+    "Skipped": "דולג",
+    "Signal": "איתות",
+    "Filtered": "סונן",
+    "Error": "שגיאה",
+    "Strong research candidate": "מועמדת מחקר חזקה",
+    "Watch closely": "לעקוב מקרוב",
+    "Do not chase": "לא לרדוף אחרי המחיר",
+    "Passed all filters.": "עבר את כל הסינונים.",
+    "Failed Blink filter: exchange or market cap.": "נכשל בסינון Blink: בורסה או שווי שוק.",
+    "No concrete positive catalyst.": "לא נמצא קטליזטור חיובי ממשי.",
+    "Failed buy-low technical validation.": "נכשל באימות הטכני של קנייה במחיר נמוך.",
 }
 
 
@@ -501,24 +584,25 @@ def get_secret_or_env(name: str) -> str | None:
     return os.getenv(name)
 
 
-def analyze_catalyst(ticker: str, company_name: str, news_items: list[dict[str, str]]) -> CatalystResult:
+def analyze_catalyst(ticker: str, company_name: str, news_items: list[dict[str, str]], lang: str) -> CatalystResult:
     if not news_items:
-        return CatalystResult(ticker, False, "No recent news was found.", "none", 0.0)
+        return CatalystResult(ticker, False, tr(lang, "no_news"), "none", 0.0)
 
     openai_key = get_secret_or_env("OPENAI_API_KEY")
     if openai_key:
         try:
-            return analyze_catalyst_with_openai(ticker, company_name, news_items)
+            return analyze_catalyst_with_openai(ticker, company_name, news_items, lang)
         except Exception as exc:
             st.caption(f"LLM analysis fallback for {ticker}: {exc}")
 
-    return analyze_catalyst_with_keywords(ticker, news_items)
+    return analyze_catalyst_with_keywords(ticker, news_items, lang)
 
 
 def analyze_catalyst_with_openai(
     ticker: str,
     company_name: str,
     news_items: list[dict[str, str]],
+    lang: str,
 ) -> CatalystResult:
     from openai import OpenAI
 
@@ -529,6 +613,7 @@ def analyze_catalyst_with_openai(
         for item in news_items
     )
 
+    output_language = "Hebrew" if lang == "he" else "English"
     prompt = f"""
 Analyze these recent financial headlines for {ticker} ({company_name}).
 
@@ -539,6 +624,9 @@ Return JSON only with this shape:
   "catalyst_type": "earnings|contract|approval|breakthrough|guidance|partnership|other|none",
   "confidence": 0.0
 }}
+
+The "summary" field must be written in {output_language}.
+If {output_language} is Hebrew, write clear natural Hebrew and do not mix English except ticker symbols or company names.
 
 Flag true only for a concrete catalyst for positive change, such as a major contract,
 regulatory approval, breakthrough product, material earnings beat, raised guidance,
@@ -559,13 +647,13 @@ Headlines:
     return CatalystResult(
         ticker=ticker,
         has_positive_catalyst=bool(payload.get("has_positive_catalyst")),
-        summary=str(payload.get("summary") or "No catalyst summary returned."),
+        summary=str(payload.get("summary") or tr(lang, "no_catalyst_summary")),
         catalyst_type=str(payload.get("catalyst_type") or "other"),
         confidence=float(payload.get("confidence") or 0.0),
     )
 
 
-def analyze_catalyst_with_keywords(ticker: str, news_items: list[dict[str, str]]) -> CatalystResult:
+def analyze_catalyst_with_keywords(ticker: str, news_items: list[dict[str, str]], lang: str) -> CatalystResult:
     positive_terms = {
         "approval": "regulatory approval",
         "approves": "regulatory approval",
@@ -584,17 +672,23 @@ def analyze_catalyst_with_keywords(ticker: str, news_items: list[dict[str, str]]
         return CatalystResult(
             ticker=ticker,
             has_positive_catalyst=False,
-            summary="Recent headlines did not show a concrete positive-change catalyst. Add an OpenAI API key for stricter LLM analysis.",
+            summary=tr(lang, "no_catalyst"),
             catalyst_type="none",
             confidence=0.25,
         )
 
     top_headline = news_items[0].get("title") or "Recent news"
+    catalyst_type = matches[0]
+    catalyst_label = translate_catalyst_type(catalyst_type, lang)
+    if lang == "he":
+        summary = tr(lang, "keyword_detected").format(catalyst=catalyst_label)
+    else:
+        summary = f"{top_headline}. {tr(lang, 'keyword_detected').format(catalyst=catalyst_label)}"
     return CatalystResult(
         ticker=ticker,
         has_positive_catalyst=True,
-        summary=f"{top_headline}. Keyword analysis detected a possible {matches[0]}, so this should be reviewed manually before trading.",
-        catalyst_type=matches[0],
+        summary=summary,
+        catalyst_type=catalyst_type,
         confidence=0.55,
     )
 
@@ -627,35 +721,35 @@ def scan_tickers(
             snapshot = fetch_market_snapshot(ticker)
             technicals = technicals_from_snapshot(snapshot)
             if not technicals.get("valid"):
-                diagnostics.append({"ticker": ticker, "status": "Skipped", "reason": technicals.get("reason")})
+                diagnostics.append({"ticker": ticker, "status": tr(lang, "skipped"), "reason": tr(lang, "no_history")})
                 continue
 
             blink_ok = technicals["exchange_ok"] and technicals["market_cap_ok"]
             technical_ok = technicals["rsi_ok"] and technicals["dip_ok"]
             company_name = str(technicals["name"])
             news_items = fetch_news(ticker, company_name, max_items=max_news_items)
-            catalyst = analyze_catalyst(ticker, company_name, news_items)
+            catalyst = analyze_catalyst(ticker, company_name, news_items, lang)
             advisor = build_advisor_view(technicals, catalyst, advisor_settings)
 
             diagnostics.append(
                 {
                     "ticker": ticker,
-                    "status": "Signal" if advisor["is_actionable"] else "Filtered",
+                    "status": tr(lang, "signal") if advisor["is_actionable"] else tr(lang, "filtered"),
                     "exchange": technicals["exchange"],
                     "market_cap": technicals["market_cap"],
                     "rsi_14": technicals["rsi_14"],
                     "distance_from_high": technicals["distance_from_high"],
                     "advisor_score": advisor["score"],
-                    "verdict": advisor["verdict"],
+                    "verdict": translate_verdict(advisor["verdict"], lang),
                     "positive_catalyst": catalyst.has_positive_catalyst,
-                    "reason": filter_reason(blink_ok, technical_ok, catalyst),
+                    "reason": filter_reason(blink_ok, technical_ok, catalyst, lang),
                 }
             )
 
             if advisor["is_actionable"] or not advisor_settings.require_all_filters:
                 signals.append({**technicals, "catalyst": catalyst, "advisor": advisor, "news": news_items})
         except Exception as exc:
-            diagnostics.append({"ticker": ticker, "status": "Error", "reason": str(exc)})
+            diagnostics.append({"ticker": ticker, "status": tr(lang, "error"), "reason": str(exc)})
 
     progress.empty()
     signals.sort(key=lambda row: (row["advisor"]["score"], row["catalyst"].confidence), reverse=True)
@@ -744,14 +838,14 @@ def risk_flags(technicals: dict[str, Any], catalyst: CatalystResult) -> list[str
     return flags
 
 
-def filter_reason(blink_ok: bool, technical_ok: bool, catalyst: CatalystResult) -> str:
+def filter_reason(blink_ok: bool, technical_ok: bool, catalyst: CatalystResult, lang: str) -> str:
     if not blink_ok:
-        return "Failed Blink filter: exchange or market cap."
+        return tr(lang, "failed_blink")
     if not catalyst.has_positive_catalyst:
-        return "No concrete positive catalyst."
+        return tr(lang, "failed_catalyst")
     if not technical_ok:
-        return "Failed buy-low technical validation."
-    return "Passed all filters."
+        return tr(lang, "failed_technical")
+    return tr(lang, "passed")
 
 
 def market_trend(tickers: list[str]) -> dict[str, Any]:
@@ -794,6 +888,8 @@ def render_signal_card(signal: dict[str, Any], lang: str) -> None:
     )
     verdict = tr(lang, VERDICT_TO_KEY.get(advisor["verdict"], advisor["verdict"]))
     profile = tr(lang, PROFILE_TO_KEY.get(advisor["profile"], advisor["profile"]))
+    catalyst_summary = translate_catalyst_summary(catalyst.summary, lang)
+    catalyst_type = translate_catalyst_type(catalyst.catalyst_type, lang)
 
     st.markdown(
         f"""
@@ -805,13 +901,13 @@ def render_signal_card(signal: dict[str, Any], lang: str) -> None:
             <div class="advisor-verdict">
                 <strong>{tr(lang, "advisor_view")}:</strong> {verdict} | {tr(lang, "score")} {advisor["score"]}/100 | {tr(lang, "profile")}: {profile}
             </div>
-            <p><strong>{tr(lang, "catalyst")}:</strong> {catalyst.summary}</p>
+            <p><strong>{tr(lang, "catalyst")}:</strong> {catalyst_summary}</p>
             <span class="pill">RSI 14D: {rsi:.1f} {rsi_badge}</span>
             <span class="pill">{tr(lang, "below_high")}: {distance:.1f}% {dip_badge}</span>
             <span class="pill">{tr(lang, "market_cap")}: ${market_cap_b:.1f}B</span>
             <span class="pill">{tr(lang, "volatility")}: {format_optional_pct(volatility)}</span>
             <span class="pill">Beta: {format_optional_number(beta)}</span>
-            <span class="pill">{tr(lang, "catalyst")}: {catalyst.catalyst_type}</span>
+            <span class="pill">{tr(lang, "catalyst")}: {catalyst_type}</span>
             <p><strong>{tr(lang, "action_plan")}:</strong> {tr(lang, "entry_zone")} ${signal["entry_price"]:.2f};
             {tr(lang, "stop_loss")} ${advisor["stop_loss"]:.2f}; {tr(lang, "take_profit")} ${advisor["take_profit"]:.2f};
             {tr(lang, "risk_reward")} {advisor["risk_reward"]:.2f}:1.</p>
@@ -829,6 +925,45 @@ def translate_risk(risk: str, lang: str) -> str:
     if lang == "he":
         return RISK_TRANSLATIONS_HE.get(risk, risk)
     return risk
+
+
+def translate_catalyst_type(catalyst_type: str, lang: str) -> str:
+    if lang == "he":
+        return CATALYST_TRANSLATIONS_HE.get(catalyst_type, catalyst_type)
+    return catalyst_type
+
+
+def translate_verdict(verdict: str, lang: str) -> str:
+    return tr(lang, VERDICT_TO_KEY.get(verdict, verdict))
+
+
+def translate_market_label(label: str, lang: str) -> str:
+    if lang == "he":
+        return MARKET_LABELS_HE.get(label, label)
+    return label
+
+
+def translate_catalyst_summary(summary: str, lang: str) -> str:
+    if lang != "he":
+        return summary
+    replacements = {
+        "Keyword analysis detected a possible": "זיהוי לפי מילות מפתח מצא אפשרות לקטליזטור מסוג",
+        "so this should be reviewed manually before trading.": "ולכן יש לבדוק זאת ידנית לפני פעולה.",
+        "Recent headlines did not show a concrete positive-change catalyst. Add an OpenAI API key for stricter LLM analysis.": tr(lang, "no_catalyst"),
+        "No recent news was found.": tr(lang, "no_news"),
+        "No catalyst summary returned.": tr(lang, "no_catalyst_summary"),
+    }
+    translated = summary
+    for english, hebrew in replacements.items():
+        translated = translated.replace(english, hebrew)
+    for english, hebrew in CATALYST_TRANSLATIONS_HE.items():
+        translated = re.sub(rf"\b{re.escape(english)}\b", hebrew, translated, flags=re.IGNORECASE)
+    hebrew_anchor = "זיהוי לפי מילות מפתח"
+    if hebrew_anchor in translated:
+        prefix, suffix = translated.split(hebrew_anchor, 1)
+        if prefix and sum(char.isascii() and char.isalpha() for char in prefix) > 12:
+            translated = f"{hebrew_anchor}{suffix}"
+    return translated
 
 
 def format_optional_pct(value: Any) -> str:
@@ -869,6 +1004,30 @@ def render_watchlist(lang: str) -> None:
         st.session_state.watchlist = pd.concat([st.session_state.watchlist, new_row], ignore_index=True)
 
     st.data_editor(st.session_state.watchlist, use_container_width=True, num_rows="dynamic")
+
+
+def localize_diagnostics(df: pd.DataFrame, lang: str) -> pd.DataFrame:
+    if df.empty:
+        return df
+    localized = df.copy()
+    if lang == "he":
+        for column in ["status", "verdict", "reason"]:
+            if column in localized.columns:
+                localized[column] = localized[column].map(lambda value: DIAGNOSTIC_VALUE_TRANSLATIONS_HE.get(str(value), value))
+        column_names = {
+            "ticker": tr(lang, "diag_ticker"),
+            "status": tr(lang, "diag_status"),
+            "exchange": tr(lang, "diag_exchange"),
+            "market_cap": tr(lang, "diag_market_cap"),
+            "rsi_14": tr(lang, "diag_rsi"),
+            "distance_from_high": tr(lang, "diag_distance"),
+            "advisor_score": tr(lang, "diag_score"),
+            "verdict": tr(lang, "diag_verdict"),
+            "positive_catalyst": tr(lang, "diag_positive"),
+            "reason": tr(lang, "diag_reason"),
+        }
+        localized = localized.rename(columns=column_names)
+    return localized
 
 
 def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
@@ -930,7 +1089,7 @@ def main() -> None:
 
     trend = market_trend(tickers)
     col_1, col_2, col_3 = st.columns(3)
-    col_1.metric(tr(lang, "market_trend"), trend["label"])
+    col_1.metric(tr(lang, "market_trend"), translate_market_label(trend["label"], lang))
     col_2.metric(tr(lang, "benchmark_avg"), f"{trend['avg_change']:.2f}%")
     col_3.metric(tr(lang, "scan_universe"), f"{trend['scanned']}")
     st.caption(f"{tr(lang, 'last_refresh')}: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}. {tr(lang, 'freshness')}")
@@ -967,7 +1126,7 @@ def main() -> None:
 
     with st.expander(tr(lang, "diagnostics"), expanded=False):
         if isinstance(diagnostics, pd.DataFrame) and not diagnostics.empty:
-            st.dataframe(diagnostics, use_container_width=True)
+            st.dataframe(localize_diagnostics(diagnostics, lang), use_container_width=True)
         else:
             st.caption(tr(lang, "diagnostics_wait"))
 
