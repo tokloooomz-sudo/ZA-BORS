@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -8,8 +10,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pydantic import BaseModel
@@ -19,6 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 WATCHLIST_PATH = DATA_DIR / "watchlist.json"
 BLINK_UNIVERSE_PATH = DATA_DIR / "blink_universe.csv"
+security = HTTPBasic(auto_error=False)
 
 app = FastAPI(title="ZA-BORS")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -42,20 +46,46 @@ class ScanRequest(BaseModel):
     max_investment: float = 1000
 
 
+def require_login(credentials: HTTPBasicCredentials | None = Depends(security)) -> str:
+    expected_username = os.getenv("ZA_BORS_USERNAME")
+    expected_password = os.getenv("ZA_BORS_PASSWORD")
+
+    if not expected_username or not expected_password:
+        return "local"
+
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Login required",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
+    username_ok = secrets.compare_digest(credentials.username, expected_username)
+    password_ok = secrets.compare_digest(credentials.password, expected_password)
+    if username_ok and password_ok:
+        return credentials.username
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Incorrect username or password",
+        headers={"WWW-Authenticate": "Basic"},
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
-def home() -> str:
+def home(_: str = Depends(require_login)) -> str:
     template = templates.get_template("index.html")
     return template.render(app_name="ZA-BORS")
 
 
 @app.get("/api/universe")
-def universe() -> dict[str, Any]:
+def universe(_: str = Depends(require_login)) -> dict[str, Any]:
     df = pd.read_csv(BLINK_UNIVERSE_PATH)
     return {"tickers": df.head(100).to_dict(orient="records")}
 
 
 @app.get("/api/watchlist")
-def get_watchlist() -> dict[str, Any]:
+def get_watchlist(_: str = Depends(require_login)) -> dict[str, Any]:
     rows = load_watchlist()
     enriched = []
     for row in rows:
@@ -65,7 +95,7 @@ def get_watchlist() -> dict[str, Any]:
 
 
 @app.post("/api/watchlist")
-def add_watchlist(item: WatchItem) -> dict[str, Any]:
+def add_watchlist(item: WatchItem, _: str = Depends(require_login)) -> dict[str, Any]:
     rows = load_watchlist()
     ticker = item.ticker.upper().strip()
     if not ticker:
@@ -86,7 +116,7 @@ def add_watchlist(item: WatchItem) -> dict[str, Any]:
 
 
 @app.patch("/api/watchlist/{ticker}")
-def update_watchlist(ticker: str, item: WatchItem) -> dict[str, Any]:
+def update_watchlist(ticker: str, item: WatchItem, _: str = Depends(require_login)) -> dict[str, Any]:
     rows = load_watchlist()
     target = ticker.upper().strip()
     for row in rows:
@@ -100,7 +130,7 @@ def update_watchlist(ticker: str, item: WatchItem) -> dict[str, Any]:
 
 
 @app.delete("/api/watchlist/{ticker}")
-def delete_watchlist(ticker: str) -> dict[str, Any]:
+def delete_watchlist(ticker: str, _: str = Depends(require_login)) -> dict[str, Any]:
     target = ticker.upper().strip()
     rows = [row for row in load_watchlist() if row["Ticker"] != target]
     save_watchlist(rows)
@@ -108,7 +138,7 @@ def delete_watchlist(ticker: str) -> dict[str, Any]:
 
 
 @app.post("/api/scan")
-def scan(req: ScanRequest) -> JSONResponse:
+def scan(req: ScanRequest, _: str = Depends(require_login)) -> JSONResponse:
     universe_df = pd.read_csv(BLINK_UNIVERSE_PATH).head(min(max(req.tickers, 1), 100))
     rows = []
     for ticker in universe_df["ticker"].tolist():

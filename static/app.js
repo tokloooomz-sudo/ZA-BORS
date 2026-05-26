@@ -2,41 +2,46 @@ const statusEl = document.querySelector("#status");
 const signalsEl = document.querySelector("#signals");
 const watchlistEl = document.querySelector("#watchlist");
 const sellAlertsEl = document.querySelector("#sellAlerts");
+const loadingBar = document.querySelector("#loadingBar");
 
 document.querySelector("#scanButton").addEventListener("click", scan);
-document.querySelector("#refreshWatchlist").addEventListener("click", loadWatchlist);
+document.querySelector("#refreshWatchlist").addEventListener("click", () => loadWatchlist(true));
 document.querySelector("#watchForm").addEventListener("submit", async (event) => {
   event.preventDefault();
-  await fetch("/api/watchlist", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ticker: document.querySelector("#watchTicker").value,
-      buy_price: Number(document.querySelector("#watchBuyPrice").value || 0),
-      owned: document.querySelector("#watchOwned").checked,
-      notes: document.querySelector("#watchNotes").value
-    })
+  await withLoading(async () => {
+    await fetch("/api/watchlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ticker: document.querySelector("#watchTicker").value,
+        buy_price: Number(document.querySelector("#watchBuyPrice").value || 0),
+        owned: document.querySelector("#watchOwned").checked,
+        notes: document.querySelector("#watchNotes").value
+      })
+    });
+    event.target.reset();
+    await loadWatchlist(false);
   });
-  event.target.reset();
-  await loadWatchlist();
 });
 
 async function scan() {
-  statusEl.textContent = "סורק...";
-  const payload = {
-    tickers: Number(document.querySelector("#tickerCount").value || 100),
-    min_market_cap: Number(document.querySelector("#marketCap").value),
-    min_investment: Number(document.querySelector("#minInvestment").value || 100),
-    max_investment: Number(document.querySelector("#maxInvestment").value || 1000)
-  };
-  const res = await fetch("/api/scan", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+  await withLoading(async () => {
+    statusEl.textContent = "סורק...";
+    const payload = {
+      tickers: Number(document.querySelector("#tickerCount").value || 100),
+      min_market_cap: Number(document.querySelector("#marketCap").value),
+      min_investment: Number(document.querySelector("#minInvestment").value || 100),
+      max_investment: Number(document.querySelector("#maxInvestment").value || 1000)
+    };
+    const res = await fetch("/api/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    renderSignals(data.rows);
+    statusEl.textContent = `נסרקו ${data.rows.length} מניות`;
   });
-  const data = await res.json();
-  renderSignals(data.rows);
-  statusEl.textContent = `נסרקו ${data.rows.length} מניות`;
 }
 
 function renderSignals(rows) {
@@ -50,7 +55,7 @@ function renderSignals(rows) {
       </thead>
       <tbody>
         ${rows.map(row => `
-          <tr class="${isWatched(row.ticker) ? "watched" : ""}">
+          <tr data-ticker="${row.ticker}" class="${isWatched(row.ticker) ? "watched" : ""}">
             <td><button onclick="addTicker('${row.ticker}', ${row.price})" ${isWatched(row.ticker) ? "disabled" : ""}>+</button></td>
             <td>${row.ticker}</td>
             <td class="${priceClass(row.change)}">${money(row.price)}</td>
@@ -68,23 +73,36 @@ function renderSignals(rows) {
 }
 
 async function addTicker(ticker, price) {
-  await fetch("/api/watchlist", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ticker, buy_price: price, owned: false, notes: "Added from scan" })
+  await withLoading(async () => {
+    await fetch("/api/watchlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticker, buy_price: price, owned: false, notes: "Added from scan" })
+    });
+    await loadWatchlist(false);
   });
-  await loadWatchlist();
-  await scan();
+
+  const row = document.querySelector(`[data-ticker="${ticker}"]`);
+  if (row) {
+    row.classList.add("watched");
+    const button = row.querySelector("button");
+    if (button) button.disabled = true;
+  }
 }
 
 let watchedTickers = new Set();
 
-async function loadWatchlist() {
-  const res = await fetch("/api/watchlist");
-  const data = await res.json();
-  watchedTickers = new Set(data.items.map(item => item.Ticker));
-  renderAlerts(data);
-  renderWatchlist(data.items);
+async function loadWatchlist(showLoading = false) {
+  if (showLoading) startLoading();
+  try {
+    const res = await fetch("/api/watchlist");
+    const data = await res.json();
+    watchedTickers = new Set(data.items.map(item => item.Ticker));
+    renderAlerts(data);
+    renderWatchlist(data.items);
+  } finally {
+    if (showLoading) finishLoading();
+  }
 }
 
 function renderAlerts(data) {
@@ -129,17 +147,21 @@ function renderWatchlist(items) {
 }
 
 async function updateTicker(ticker, owned, buyPrice, notes) {
-  await fetch(`/api/watchlist/${ticker}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ticker, owned, buy_price: Number(buyPrice || 0), notes })
+  await withLoading(async () => {
+    await fetch(`/api/watchlist/${ticker}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticker, owned, buy_price: Number(buyPrice || 0), notes })
+    });
+    await loadWatchlist(false);
   });
-  await loadWatchlist();
 }
 
 async function removeTicker(ticker) {
-  await fetch(`/api/watchlist/${ticker}`, { method: "DELETE" });
-  await loadWatchlist();
+  await withLoading(async () => {
+    await fetch(`/api/watchlist/${ticker}`, { method: "DELETE" });
+    await loadWatchlist(false);
+  });
 }
 
 function livePL(item, quote) {
@@ -149,6 +171,26 @@ function livePL(item, quote) {
   const amount = price - buy;
   const pct = (amount / buy) * 100;
   return { amount, text: `${amount >= 0 ? "▲" : "▼"} ${money(amount)} (${num(pct)}%)` };
+}
+
+async function withLoading(task) {
+  startLoading();
+  try {
+    return await task();
+  } finally {
+    finishLoading();
+  }
+}
+
+function startLoading() {
+  loadingBar.classList.remove("done");
+  loadingBar.classList.add("active");
+}
+
+function finishLoading() {
+  loadingBar.classList.remove("active");
+  loadingBar.classList.add("done");
+  setTimeout(() => loadingBar.classList.remove("done"), 300);
 }
 
 function verdictClass(v) {
@@ -167,4 +209,4 @@ function isWatched(ticker) { return watchedTickers.has(ticker); }
 function escapeAttr(value) { return String(value).replaceAll("'", "&#39;").replaceAll('"', "&quot;"); }
 
 loadWatchlist();
-setInterval(loadWatchlist, 15000);
+setInterval(() => loadWatchlist(false), 15000);
