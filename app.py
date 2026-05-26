@@ -20,6 +20,7 @@ MIN_MARKET_CAP = 1_000_000_000
 MAJOR_EXCHANGES = {"NMS", "NYQ", "NGM", "NCM", "NASDAQ", "NYSE"}
 DEFAULT_UNIVERSE_PATH = "data/default_universe.csv"
 OPPORTUNITY_UNIVERSE_PATH = "data/opportunity_universe.csv"
+BLINK_UNIVERSE_PATH = "data/blink_universe.csv"
 
 TRANSLATIONS = {
     "en": {
@@ -28,6 +29,7 @@ TRANSLATIONS = {
         "scan_settings": "Scan Settings",
         "universe": "Universe",
         "default_universe": "Default liquid US list",
+        "blink_universe": "Blink platform watchlist",
         "opportunity_universe": "High-upside watchlist: small caps, ADRs, Israel",
         "custom_tickers": "Custom tickers",
         "min_market_cap": "Minimum market cap filter",
@@ -48,6 +50,7 @@ TRANSLATIONS = {
         "optional_secrets": "Optional secrets: OPENAI_API_KEY, OPENAI_MODEL, NEWSAPI_KEY.",
         "fallback_news": "Without keys, the app uses Google News RSS plus keyword catalyst detection.",
         "real_time_note": "For true real-time quotes, connect a paid market-data provider later. yfinance may be delayed.",
+        "blink_note": "Blink availability is a working list. Confirm each ticker in the Blink app before trading.",
         "risk_note": "Professional-style research assistant only. It is not a licensed investment advisor, and signals must be reviewed manually before any trade.",
         "market_trend": "Market trend",
         "benchmark_avg": "1M benchmark avg",
@@ -120,6 +123,7 @@ TRANSLATIONS = {
         "scan_settings": "הגדרות סריקה",
         "universe": "מאגר מניות",
         "default_universe": "רשימת מניות אמריקאיות נזילות",
+        "blink_universe": "רשימת BLINK",
         "opportunity_universe": "רשימת הזדמנויות: קטנות, ADR וישראליות",
         "custom_tickers": "סימולים מותאמים אישית",
         "min_market_cap": "סינון שווי שוק מינימלי",
@@ -140,6 +144,7 @@ TRANSLATIONS = {
         "optional_secrets": "מפתחות אופציונליים: OPENAI_API_KEY, OPENAI_MODEL, NEWSAPI_KEY.",
         "fallback_news": "ללא מפתחות, האפליקציה משתמשת ב-Google News RSS ובזיהוי קטליזטורים לפי מילות מפתח.",
         "real_time_note": "לציטוטים בזמן אמת מלא יש לחבר ספק נתוני שוק בתשלום. yfinance עשוי להיות מעוכב.",
+        "blink_note": "רשימת BLINK היא רשימת עבודה. לפני מסחר אמיתי יש לוודא שכל סימול מופיע באפליקציית BLINK.",
         "risk_note": "זהו עוזר מחקר בסגנון מקצועי בלבד. הוא אינו יועץ השקעות מורשה, וכל איתות דורש בדיקה ידנית לפני פעולה.",
         "market_trend": "מגמת שוק",
         "benchmark_avg": "ממוצע מדדים לחודש",
@@ -406,6 +411,11 @@ def load_default_universe() -> pd.DataFrame:
 @st.cache_data(ttl=60 * 60)
 def load_opportunity_universe() -> pd.DataFrame:
     return pd.read_csv(OPPORTUNITY_UNIVERSE_PATH)
+
+
+@st.cache_data(ttl=60 * 60)
+def load_blink_universe() -> pd.DataFrame:
+    return pd.read_csv(BLINK_UNIVERSE_PATH)
 
 
 @st.cache_data(ttl=60 * 15)
@@ -1049,12 +1059,22 @@ def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
     st.sidebar.header(tr(lang, "scan_settings"))
     default_universe = load_default_universe()
     opportunity_universe = load_opportunity_universe()
-    universe_labels = [tr(lang, "default_universe"), tr(lang, "opportunity_universe"), tr(lang, "custom_tickers")]
+    blink_universe = load_blink_universe()
+    universe_labels = [
+        tr(lang, "default_universe"),
+        tr(lang, "blink_universe"),
+        tr(lang, "opportunity_universe"),
+        tr(lang, "custom_tickers"),
+    ]
     universe_mode = st.sidebar.radio(tr(lang, "universe"), universe_labels, index=0)
 
     if universe_mode == tr(lang, "default_universe"):
         max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, len(default_universe), 15)
         tickers = default_universe["ticker"].head(max_count).tolist()
+    elif universe_mode == tr(lang, "blink_universe"):
+        max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, len(blink_universe), min(35, len(blink_universe)))
+        tickers = blink_universe["ticker"].head(max_count).tolist()
+        st.sidebar.caption(tr(lang, "blink_note"))
     elif universe_mode == tr(lang, "opportunity_universe"):
         max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, len(opportunity_universe), min(25, len(opportunity_universe)))
         tickers = opportunity_universe["ticker"].head(max_count).tolist()

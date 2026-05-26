@@ -1,0 +1,72 @@
+ticker,name,category
+AAPL,Apple,US mega cap
+MSFT,Microsoft,US mega cap
+NVDA,NVIDIA,US mega cap
+AMZN,Amazon,US mega cap
+GOOGL,Alphabet Class A,US mega cap
+GOOG,Alphabet Class C,US mega cap
+META,Meta Platforms,US mega cap
+TSLA,Tesla,US high beta
+AVGO,Broadcom,Semiconductors
+AMD,Advanced Micro Devices,Semiconductors
+NFLX,Netflix,Media
+CRM,Salesforce,Software
+ORCL,Oracle,Software
+ADBE,Adobe,Software
+INTC,Intel,Semiconductors
+PYPL,PayPal,Fintech
+SHOP,Shopify,Ecommerce
+UBER,Uber,Mobility
+ABNB,Airbnb,Travel
+PLTR,Palantir,Software / AI
+SNOW,Snowflake,Software
+JPM,JPMorgan Chase,Bank
+BAC,Bank of America,Bank
+V,Visa,Payments
+MA,Mastercard,Payments
+DIS,Walt Disney,Media
+NKE,Nike,Consumer
+PFE,Pfizer,Healthcare
+MRNA,Moderna,Biotech
+LLY,Eli Lilly,Healthcare
+UNH,UnitedHealth,Healthcare
+FUTU,Futu Holdings,International broker / high beta
+TIGR,UP Fintech Holding,International broker / high beta
+SOFI,SoFi Technologies,Fintech / high beta
+HOOD,Robinhood Markets,Fintech / high beta
+RIVN,Rivian Automotive,EV / high beta
+LCID,Lucid Group,EV / high beta
+RUN,Sunrun,Solar / high beta
+ENPH,Enphase Energy,Solar
+SEDG,SolarEdge Technologies,Israel / solar
+PLUG,Plug Power,Clean energy / high risk
+CHPT,ChargePoint,EV charging / high risk
+OPEN,Opendoor Technologies,Real estate tech / high risk
+WBD,Warner Bros Discovery,Media turnaround
+PARA,Paramount Global,Media turnaround
+ROKU,Roku,Streaming / ads
+U,Unity Software,Software / gaming
+PATH,UiPath,Automation
+LMND,Lemonade,Israel / insurance tech
+WIX,Wix.com,Israel / software
+FVRR,Fiverr International,Israel / marketplace
+GLBE,Global-e Online,Israel / ecommerce
+INMD,InMode,Israel / medical devices
+NICE,NICE Ltd,Israel / software ADR
+MNDY,monday.com,Israel / software
+CYBR,CyberArk Software,Israel / cybersecurity
+PERI,Perion Network,Israel / ad tech
+CAMT,Camtek,Israel / semiconductor equipment
+TSEM,Tower Semiconductor,Israel / semiconductor
+ITRN,Ituran Location and Control,Israel / telematics
+NVMI,Nova Ltd,Israel / metrology
+KRNT,Kornit Digital,Israel / digital printing
+SPNS,Sapiens International,Israel / software
+AUDC,AudioCodes,Israel / communications
+NNDM,Nano Dimension,Israel / high risk
+RADA,RADA Electronic Industries,Israel / defense legacy
+EVGN,Evogene,Israel / biotech high risk
+IONQ,IonQ,Quantum computing
+QBTS,D-Wave Quantum,Quantum computing
+RGTI,Rigetti Computing,Quantum computing
+BLNK,Blink Charging,EV charging / small cap

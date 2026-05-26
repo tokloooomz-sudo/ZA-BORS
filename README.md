@@ -11,6 +11,7 @@ Personal Streamlit dashboard for professional-style US stock research and "buy l
   - NYSE/NASDAQ only.
   - Configurable market-cap floor, from no minimum to $1B.
 - Includes a high-upside universe with FUTU, selected small caps, ADRs, and Israeli companies listed in the US.
+- Includes a Blink working universe in `data/blink_universe.csv` for tickers the user wants to scan through the Blink workflow.
 - Fetches recent news through NewsAPI when available, otherwise Google News RSS.
 - Uses OpenAI sentiment/catalyst analysis when `OPENAI_API_KEY` is available.
 - Falls back to a conservative keyword catalyst detector when no LLM key is configured.
@@ -97,3 +98,4 @@ The app is mobile-friendly in the browser. For phone access, deploy it online:
 - `yfinance` data can be delayed or incomplete.
 - News and LLM sentiment are inputs for research, not trading instructions.
 - Always confirm that a ticker is available in your actual broker app before placing an order.
+- The Blink universe is an editable working list, not an official complete list from Blink.
