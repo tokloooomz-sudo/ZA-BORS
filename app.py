@@ -47,10 +47,11 @@ TRANSLATIONS = {
         "balanced": "Balanced",
         "conservative": "Conservative",
         "aggressive": "Aggressive",
-        "account_size": "Account size for sizing ($)",
+        "min_investment": "Minimum investment per stock ($)",
+        "max_investment": "Maximum investment per stock ($)",
+        "investment_range": "Investment range",
         "max_risk": "Max risk per trade (%)",
         "stop_loss_pct": "Default stop-loss (%)",
-        "max_allocation": "Max allocation per stock (%)",
         "only_professional": "Show only professional-grade signals",
         "optional_secrets": "Optional secrets: OPENAI_API_KEY, OPENAI_MODEL, NEWSAPI_KEY.",
         "fallback_news": "Without keys, the app uses Google News RSS plus keyword catalyst detection.",
@@ -108,6 +109,7 @@ TRANSLATIONS = {
         "suggested": "suggested",
         "shares": "shares",
         "position_value": "position value",
+        "shares_in_budget": "shares in your range",
         "at_risk": "at risk",
         "news": "News",
         "no_history": "No price history returned by yfinance.",
@@ -157,10 +159,11 @@ TRANSLATIONS = {
         "balanced": "מאוזן",
         "conservative": "שמרני",
         "aggressive": "אגרסיבי",
-        "account_size": "גודל תיק לחישוב פוזיציה ($)",
+        "min_investment": "מינימום השקעה למניה ($)",
+        "max_investment": "מקסימום השקעה למניה ($)",
+        "investment_range": "טווח השקעה",
         "max_risk": "סיכון מקסימלי לעסקה (%)",
         "stop_loss_pct": "סטופ-לוס ברירת מחדל (%)",
-        "max_allocation": "הקצאה מקסימלית למניה (%)",
         "only_professional": "הצג רק איתותים ברמה מקצועית",
         "optional_secrets": "מפתחות אופציונליים: OPENAI_API_KEY, OPENAI_MODEL, NEWSAPI_KEY.",
         "fallback_news": "ללא מפתחות, האפליקציה משתמשת ב-Google News RSS ובזיהוי קטליזטורים לפי מילות מפתח.",
@@ -218,6 +221,7 @@ TRANSLATIONS = {
         "suggested": "מוצע",
         "shares": "מניות",
         "position_value": "שווי פוזיציה",
+        "shares_in_budget": "מניות בטווח שלך",
         "at_risk": "בסיכון",
         "news": "חדשה",
         "no_history": "לא התקבלו נתוני מחיר מ-yfinance.",
@@ -268,6 +272,7 @@ RISK_TRANSLATIONS_HE = {
     "High beta; stock may move harder than the market.": "Beta גבוה; המניה עשויה לנוע חזק יותר מהשוק.",
     "RSI filter did not pass.": "סינון RSI לא עבר.",
     "Price is not far enough below its 52-week high.": "המחיר אינו רחוק מספיק משיא 52 השבועות.",
+    "Stock price does not fit your per-stock investment range.": "מחיר המניה לא מתאים לטווח ההשקעה שהגדרת למניה.",
     "Main risks are execution timing, news reversal, and broad market weakness.": "הסיכונים המרכזיים הם תזמון ביצוע, היפוך חדשות וחולשה כללית בשוק.",
 }
 
@@ -348,10 +353,10 @@ class CatalystResult:
 @dataclass
 class AdvisorSettings:
     profile: str
-    account_size: float
+    min_investment: float
+    max_investment: float
     risk_per_trade_pct: float
     stop_loss_pct: float
-    max_position_pct: float
     require_all_filters: bool
     min_market_cap: float
     watchlist_auto_refresh: bool
@@ -876,11 +881,12 @@ def build_advisor_view(
     stop_loss = current_price * (1 - settings.stop_loss_pct / 100)
     take_profit = current_price * 1.2
     risk_per_share = max(current_price - stop_loss, 0.01)
-    dollars_at_risk = settings.account_size * (settings.risk_per_trade_pct / 100)
-    risk_based_shares = int(dollars_at_risk // risk_per_share)
-    max_position_value = settings.account_size * (settings.max_position_pct / 100)
-    allocation_based_shares = int(max_position_value // current_price) if current_price else 0
-    suggested_shares = max(0, min(risk_based_shares, allocation_based_shares))
+    min_shares = int(np.ceil(settings.min_investment / current_price)) if current_price else 0
+    max_shares = int(settings.max_investment // current_price) if current_price else 0
+    suggested_shares = max(0, max_shares)
+    suggested_position_value = suggested_shares * current_price
+    dollars_at_risk = suggested_shares * risk_per_share
+    affordable = max_shares >= 1 and suggested_position_value >= settings.min_investment
 
     blink_ok = technicals["exchange_ok"] and technicals["market_cap_ok"]
     technical_ok = technicals["rsi_ok"] and technicals["dip_ok"]
@@ -890,17 +896,21 @@ def build_advisor_view(
     catalyst_score = clamp_score(catalyst.confidence * 100)
     risk_penalty = risk_penalty_score(technicals)
 
+    affordability_bonus = 8 if affordable else -20
     score = round(
         catalyst_score * 0.35
         + rsi_score * 0.2
         + dip_score * 0.2
         + liquidity_score * 0.15
         + (100 - risk_penalty) * 0.1
+        + affordability_bonus
     )
 
-    is_actionable = blink_ok and technical_ok and catalyst.has_positive_catalyst and score >= 65
+    is_actionable = blink_ok and technical_ok and catalyst.has_positive_catalyst and affordable and score >= 65
     verdict = "Strong research candidate" if score >= 80 else "Watch closely" if score >= 65 else "Do not chase"
     risks = risk_flags(technicals, catalyst)
+    if not affordable:
+        risks.append("Stock price does not fit your per-stock investment range.")
 
     return {
         "score": score,
@@ -910,8 +920,11 @@ def build_advisor_view(
         "take_profit": take_profit,
         "risk_reward": (take_profit - current_price) / risk_per_share,
         "suggested_shares": suggested_shares,
-        "suggested_position_value": suggested_shares * current_price,
-        "dollars_at_risk": min(suggested_shares * risk_per_share, dollars_at_risk),
+        "min_shares": min_shares,
+        "max_shares": max_shares,
+        "suggested_position_value": suggested_position_value,
+        "dollars_at_risk": dollars_at_risk,
+        "affordable": affordable,
         "risks": risks,
         "profile": settings.profile,
     }
@@ -1023,7 +1036,8 @@ def render_signal_card(signal: dict[str, Any], lang: str) -> None:
             {tr(lang, "stop_loss")} ${advisor["stop_loss"]:.2f}; {tr(lang, "take_profit")} ${advisor["take_profit"]:.2f};
             {tr(lang, "risk_reward")} {advisor["risk_reward"]:.2f}:1.</p>
             <p><strong>{tr(lang, "position_sizing")}:</strong> {tr(lang, "suggested")} {advisor["suggested_shares"]} {tr(lang, "shares")},
-            ${advisor["suggested_position_value"]:.0f} {tr(lang, "position_value")}, ${advisor["dollars_at_risk"]:.0f} {tr(lang, "at_risk")}.</p>
+            ${advisor["suggested_position_value"]:.0f} {tr(lang, "position_value")}, {advisor["min_shares"]}-{advisor["max_shares"]} {tr(lang, "shares_in_budget")},
+            ${advisor["dollars_at_risk"]:.0f} {tr(lang, "at_risk")}.</p>
             <ul class="risk-list">{risk_items}</ul>
             <p>{news_links}</p>
         </div>
@@ -1322,14 +1336,17 @@ def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
     profile_label = st.sidebar.selectbox(tr(lang, "risk_profile"), list(profile_label_to_value), index=0)
     profile = profile_label_to_value[profile_label]
     defaults = {
-        "Conservative": {"risk": 0.5, "stop": 8.0, "max_position": 10.0},
-        "Balanced": {"risk": 1.0, "stop": 10.0, "max_position": 15.0},
-        "Aggressive": {"risk": 1.5, "stop": 12.0, "max_position": 20.0},
+        "Conservative": {"risk": 0.5, "stop": 8.0},
+        "Balanced": {"risk": 1.0, "stop": 10.0},
+        "Aggressive": {"risk": 1.5, "stop": 12.0},
     }[profile]
-    account_size = st.sidebar.number_input(tr(lang, "account_size"), min_value=1000, value=10000, step=500)
+    min_investment = st.sidebar.number_input(tr(lang, "min_investment"), min_value=1, value=100, step=50)
+    max_investment = st.sidebar.number_input(tr(lang, "max_investment"), min_value=1, value=1000, step=100)
+    if max_investment < min_investment:
+        st.sidebar.warning("Maximum must be higher than minimum." if lang == "en" else "המקסימום חייב להיות גבוה מהמינימום.")
+        max_investment = min_investment
     risk_per_trade_pct = st.sidebar.slider(tr(lang, "max_risk"), 0.1, 3.0, defaults["risk"], 0.1)
     stop_loss_pct = st.sidebar.slider(tr(lang, "stop_loss_pct"), 3.0, 20.0, defaults["stop"], 0.5)
-    max_position_pct = st.sidebar.slider(tr(lang, "max_allocation"), 2.0, 40.0, defaults["max_position"], 1.0)
     require_all_filters = st.sidebar.toggle(tr(lang, "only_professional"), value=True)
     st.sidebar.divider()
     watchlist_auto_refresh = st.sidebar.toggle(tr(lang, "auto_refresh"), value=True)
@@ -1341,10 +1358,10 @@ def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
     st.sidebar.caption(tr(lang, "real_time_note"))
     return tickers, max_news_items, AdvisorSettings(
         profile=profile,
-        account_size=float(account_size),
+        min_investment=float(min_investment),
+        max_investment=float(max_investment),
         risk_per_trade_pct=float(risk_per_trade_pct),
         stop_loss_pct=float(stop_loss_pct),
-        max_position_pct=float(max_position_pct),
         require_all_filters=bool(require_all_filters),
         min_market_cap=float(min_market_cap),
         watchlist_auto_refresh=bool(watchlist_auto_refresh),

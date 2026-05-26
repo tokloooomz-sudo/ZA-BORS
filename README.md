@@ -38,10 +38,9 @@ Personal Streamlit dashboard for professional-style US stock research and "buy l
 The sidebar includes risk controls:
 
 - Risk profile: Conservative, Balanced, or Aggressive.
-- Account size for position sizing.
+- Minimum and maximum investment amount per stock.
 - Maximum risk per trade.
 - Default stop-loss percentage.
-- Maximum allocation per stock.
 - Option to show only professional-grade signals.
 
 The app will only mark a candidate as actionable when it passes:
