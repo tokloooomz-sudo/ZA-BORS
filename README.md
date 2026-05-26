@@ -1,27 +1,63 @@
 # ZA-BORS
 
-אפליקציית MVP לבחירת נכס שכירות באזור הבורסה ברמת גן, עם הכנה לחיבור נתוני BLINK.
+Personal Streamlit dashboard for scanning US stocks for possible "buy low, sell high" research signals.
 
-## מה יש עכשיו
+> This is a research tool only. It is not financial advice.
 
-- דירוג נכסים לפי תקציב, שטח, קרבה לרכבת, זמינות, איכות, גמישות חוזה, חניה והתאמה לצוות.
-- טבלת נכסים עם מיון לפי ציון.
-- טופס הוספת נכס ידני.
-- יבוא נתונים מקובץ JSON או CSV.
-- שמירה מקומית בדפדפן.
+## What It Does
 
-## הפעלה
+- Scans a configurable US stock universe.
+- Applies the "Blink Filter":
+  - NYSE/NASDAQ only.
+  - Market cap above $1B.
+- Fetches recent news through NewsAPI when available, otherwise Google News RSS.
+- Uses OpenAI sentiment/catalyst analysis when `OPENAI_API_KEY` is available.
+- Falls back to a conservative keyword catalyst detector when no LLM key is configured.
+- Validates "buy low" technicals:
+  - 14-day RSI below 45.
+  - Current price at least 10% below the 52-week high.
+- Shows clean Streamlit cards with:
+  - ticker and price,
+  - catalyst summary,
+  - RSI and dip checklist,
+  - proposed entry and 20% take-profit target.
+- Includes a simple manual watchlist.
 
-פותחים את `index.html` בדפדפן. אין צורך בהתקנה או `npm`.
+## Local Setup
 
-## פורמט יבוא
-
-אפשר לייבא JSON כמערך אובייקטים או CSV עם כותרות:
-
-```csv
-title,address,monthlyRent,sqm,walkToTrain,floor,parking,availableFrom,contractMonths,conditionScore,fitScore,notes
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-## חיבור BLINK בהמשך
+If `python` is not installed on this Windows machine, install Python 3.11+ first.
 
-כרגע אין כאן מפתח או תיעוד API ספציפי לפלטפורמת BLINK הרלוונטית. כשיהיו פרטי API/ייצוא, מחברים אותם בשכבת יבוא שממפה את השדות לפורמט של האפליקציה.
+## Optional API Keys
+
+Create `.streamlit/secrets.toml`:
+
+```toml
+OPENAI_API_KEY = "your_openai_key"
+OPENAI_MODEL = "gpt-5.2"
+NEWSAPI_KEY = "your_newsapi_key"
+```
+
+You can also set these as environment variables.
+
+## Use On Your Phone
+
+The app is mobile-friendly in the browser. For phone access, deploy it online:
+
+1. Push this repository to GitHub.
+2. Create a free Streamlit Community Cloud app.
+3. Select this repo and set `app.py` as the entry file.
+4. Add the secrets above in the Streamlit Cloud secrets manager.
+5. Open the deployed URL on your phone and add it to your home screen.
+
+## Notes
+
+- `yfinance` data can be delayed or incomplete.
+- News and LLM sentiment are inputs for research, not trading instructions.
+- Always confirm that a ticker is available in your actual broker app before placing an order.

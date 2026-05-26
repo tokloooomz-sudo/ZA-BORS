@@ -1,7 +1,10 @@
 node_modules/
 dist/
+__pycache__/
+*.py[cod]
 .env
 .env.*
+.streamlit/secrets.toml
 *.log
 .DS_Store
 Thumbs.db
