@@ -53,6 +53,7 @@ TRANSLATIONS = {
         "max_risk": "Max risk per trade (%)",
         "stop_loss_pct": "Default stop-loss (%)",
         "only_professional": "Show only professional-grade signals",
+        "only_professional_help": "When enabled, the main results show only Watch closely / Strong research candidate. Do not chase remains in diagnostics.",
         "optional_secrets": "Optional secrets: OPENAI_API_KEY, OPENAI_MODEL, NEWSAPI_KEY.",
         "fallback_news": "Without keys, the app uses Google News RSS plus keyword catalyst detection.",
         "real_time_note": "For true real-time quotes, connect a paid market-data provider later. yfinance may be delayed.",
@@ -164,7 +165,8 @@ TRANSLATIONS = {
         "investment_range": "טווח השקעה",
         "max_risk": "סיכון מקסימלי לעסקה (%)",
         "stop_loss_pct": "סטופ-לוס ברירת מחדל (%)",
-        "only_professional": "הצג רק איתותים ברמה מקצועית",
+        "only_professional": "הצג רק כדאי לעקוב / כדאי מאוד",
+        "only_professional_help": "כאשר פעיל, התוצאות הראשיות יציגו רק כדאי לעקוב וכדאי מאוד. לא כדאי עכשיו יישאר באבחון בלבד.",
         "optional_secrets": "מפתחות אופציונליים: OPENAI_API_KEY, OPENAI_MODEL, NEWSAPI_KEY.",
         "fallback_news": "ללא מפתחות, האפליקציה משתמשת ב-Google News RSS ובזיהוי קטליזטורים לפי מילות מפתח.",
         "real_time_note": "לציטוטים בזמן אמת מלא יש לחבר ספק נתוני שוק בתשלום. yfinance עשוי להיות מעוכב.",
@@ -862,7 +864,8 @@ def scan_tickers(
                 }
             )
 
-            if advisor["is_actionable"] or not advisor_settings.require_all_filters:
+            show_candidate = advisor["score"] >= 65 and advisor["verdict"] != "Do not chase"
+            if (show_candidate and advisor_settings.require_all_filters) or not advisor_settings.require_all_filters:
                 signals.append({**technicals, "catalyst": catalyst, "advisor": advisor, "news": news_items})
         except Exception as exc:
             diagnostics.append({"ticker": ticker, "status": tr(lang, "error"), "reason": str(exc)})
@@ -1297,17 +1300,20 @@ def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
         tr(lang, "opportunity_universe"),
         tr(lang, "custom_tickers"),
     ]
-    universe_mode = st.sidebar.radio(tr(lang, "universe"), universe_labels, index=0)
+    universe_mode = st.sidebar.radio(tr(lang, "universe"), universe_labels, index=1)
 
     if universe_mode == tr(lang, "default_universe"):
-        max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, len(default_universe), 15)
+        max_limit = min(100, len(default_universe))
+        max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, max_limit, min(35, max_limit))
         tickers = default_universe["ticker"].head(max_count).tolist()
     elif universe_mode == tr(lang, "blink_universe"):
-        max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, len(blink_universe), min(35, len(blink_universe)))
+        max_limit = min(100, len(blink_universe))
+        max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, max_limit, max_limit)
         tickers = blink_universe["ticker"].head(max_count).tolist()
         st.sidebar.caption(tr(lang, "blink_note"))
     elif universe_mode == tr(lang, "opportunity_universe"):
-        max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, len(opportunity_universe), min(25, len(opportunity_universe)))
+        max_limit = min(100, len(opportunity_universe))
+        max_count = st.sidebar.slider(tr(lang, "max_tickers"), 5, max_limit, min(35, max_limit))
         tickers = opportunity_universe["ticker"].head(max_count).tolist()
     else:
         raw = st.sidebar.text_area(tr(lang, "tickers"), value="AAPL, MSFT, NVDA, AMD, TSLA")
@@ -1347,7 +1353,11 @@ def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
         max_investment = min_investment
     risk_per_trade_pct = st.sidebar.slider(tr(lang, "max_risk"), 0.1, 3.0, defaults["risk"], 0.1)
     stop_loss_pct = st.sidebar.slider(tr(lang, "stop_loss_pct"), 3.0, 20.0, defaults["stop"], 0.5)
-    require_all_filters = st.sidebar.toggle(tr(lang, "only_professional"), value=True)
+    require_all_filters = st.sidebar.toggle(
+        tr(lang, "only_professional"),
+        value=True,
+        help=tr(lang, "only_professional_help"),
+    )
     st.sidebar.divider()
     watchlist_auto_refresh = st.sidebar.toggle(tr(lang, "auto_refresh"), value=True)
     watchlist_refresh_seconds = st.sidebar.slider(tr(lang, "refresh_seconds"), 5, 120, 15, 5)

@@ -12,6 +12,7 @@ Personal Streamlit dashboard for professional-style US stock research and "buy l
   - Configurable market-cap floor, from no minimum to $1B.
 - Includes a high-upside universe with FUTU, selected small caps, ADRs, and Israeli companies listed in the US.
 - Includes a Blink working universe in `data/blink_universe.csv` for tickers the user wants to scan through the Blink workflow.
+- Blink is the default scan universe and can scan up to 100 tickers.
 - Fetches recent news through NewsAPI when available, otherwise Google News RSS.
 - Uses OpenAI sentiment/catalyst analysis when `OPENAI_API_KEY` is available.
 - Falls back to a conservative keyword catalyst detector when no LLM key is configured.
