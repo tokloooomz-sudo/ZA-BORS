@@ -1,8 +1,8 @@
 # ZA-BORS
 
-Personal Streamlit dashboard for scanning US stocks for possible "buy low, sell high" research signals.
+Personal Streamlit dashboard for professional-style US stock research and "buy low, sell high" signal discovery.
 
-> This is a research tool only. It is not financial advice.
+> This is a professional-style research assistant only. It is not a licensed investment advisor and it is not financial advice.
 
 ## What It Does
 
@@ -20,8 +20,42 @@ Personal Streamlit dashboard for scanning US stocks for possible "buy low, sell 
   - ticker and price,
   - catalyst summary,
   - RSI and dip checklist,
-  - proposed entry and 20% take-profit target.
+  - advisor score and verdict,
+  - proposed entry, stop-loss, and 20% take-profit target,
+  - estimated risk/reward,
+  - suggested position size based on account size and risk settings,
+  - key risk flags.
 - Includes a simple manual watchlist.
+
+## Professional Advisor Mode
+
+The sidebar includes risk controls:
+
+- Risk profile: Conservative, Balanced, or Aggressive.
+- Account size for position sizing.
+- Maximum risk per trade.
+- Default stop-loss percentage.
+- Maximum allocation per stock.
+- Option to show only professional-grade signals.
+
+The app will only mark a candidate as actionable when it passes:
+
+- Blink filter: NYSE/NASDAQ and market cap above $1B.
+- Catalyst filter: concrete positive catalyst.
+- Technical filter: RSI below 45 and at least 10% below the 52-week high.
+- Advisor score: 65 or higher.
+
+## Real-Time Data
+
+The current implementation uses `yfinance`, which may be delayed or incomplete. For true professional real-time use, connect a dedicated market-data provider such as a paid quote/news API, then replace the `fetch_market_snapshot` and `fetch_news` functions.
+
+Recommended future upgrade path:
+
+1. Add a real-time quote provider.
+2. Add authenticated broker availability checks for Blink or the broker you use.
+3. Add portfolio holdings and exposure limits.
+4. Add alerting by SMS, WhatsApp, email, or push notifications.
+5. Add audit logs so every signal records the data used at decision time.
 
 ## Local Setup
 
