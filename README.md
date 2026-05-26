@@ -29,6 +29,7 @@ Personal Streamlit dashboard for professional-style US stock research and "buy l
   - key risk flags.
 - Includes a simple manual watchlist.
 - Watchlist entries are added through a simple ticker form and can be removed from the page.
+- Watchlist quotes show price, daily change, green/red direction arrows, and can auto-refresh while the app is open.
 - Supports English and Hebrew UI with right-to-left layout in Hebrew.
 
 ## Professional Advisor Mode
@@ -100,3 +101,4 @@ The app is mobile-friendly in the browser. For phone access, deploy it online:
 - News and LLM sentiment are inputs for research, not trading instructions.
 - Always confirm that a ticker is available in your actual broker app before placing an order.
 - The Blink universe is an editable working list, not an official complete list from Blink.
+- Watchlist quote refresh uses the configured data provider. `yfinance` is not guaranteed to be real-time; connect a paid market-data API for professional real-time prices.

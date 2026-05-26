@@ -14,6 +14,11 @@ import requests
 import streamlit as st
 import yfinance as yf
 
+try:
+    from streamlit_autorefresh import st_autorefresh
+except ImportError:
+    st_autorefresh = None
+
 
 APP_NAME = "ZA-BORS"
 MIN_MARKET_CAP = 1_000_000_000
@@ -67,7 +72,7 @@ TRANSLATIONS = {
         "diagnostics": "Diagnostics / filtered tickers",
         "diagnostics_wait": "Diagnostics will appear after the first scan.",
         "watchlist": "My Watchlist",
-        "watchlist_help": "Type a ticker and optional note, then press Add. The list is saved for this app session.",
+        "watchlist_help": "Type a ticker and optional note, then press Add. Prices refresh automatically while the app is open.",
         "notes": "Notes",
         "notes_placeholder": "Why are you watching it?",
         "add_watchlist": "Add to watchlist",
@@ -78,6 +83,13 @@ TRANSLATIONS = {
         "already_in_watchlist": "{ticker} is already in your watchlist.",
         "empty_watchlist": "Your watchlist is empty.",
         "added": "Added",
+        "live_price": "Price",
+        "daily_change": "Change",
+        "quote_time": "Quote update",
+        "quote_unavailable": "Quote unavailable",
+        "auto_refresh": "Auto-refresh watchlist quotes",
+        "refresh_seconds": "Quote refresh interval (seconds)",
+        "delayed_quotes": "Prices use the configured data provider and may be delayed. For true real-time quotes, connect a paid market-data API.",
         "starting_scan": "Starting scan...",
         "scanning": "Scanning",
         "advisor_view": "Advisor View",
@@ -169,7 +181,7 @@ TRANSLATIONS = {
         "diagnostics": "אבחון / מניות שסוננו",
         "diagnostics_wait": "האבחון יופיע לאחר הסריקה הראשונה.",
         "watchlist": "רשימת מעקב אישית",
-        "watchlist_help": "כתוב סימול מניה והערה אופציונלית, ואז לחץ הוסף. הרשימה נשמרת בסשן של האפליקציה.",
+        "watchlist_help": "כתוב סימול מניה והערה אופציונלית, ואז לחץ הוסף. המחירים מתרעננים אוטומטית כל עוד האפליקציה פתוחה.",
         "notes": "הערות",
         "notes_placeholder": "למה אתה עוקב אחריה?",
         "add_watchlist": "הוסף לרשימת מעקב",
@@ -180,6 +192,13 @@ TRANSLATIONS = {
         "already_in_watchlist": "{ticker} כבר נמצאת ברשימת המעקב.",
         "empty_watchlist": "רשימת המעקב ריקה.",
         "added": "נוסף בתאריך",
+        "live_price": "מחיר",
+        "daily_change": "שינוי",
+        "quote_time": "עדכון מחיר",
+        "quote_unavailable": "אין מחיר זמין",
+        "auto_refresh": "רענון אוטומטי למחירי רשימת המעקב",
+        "refresh_seconds": "מרווח רענון מחירים בשניות",
+        "delayed_quotes": "המחירים מגיעים מספק הנתונים המוגדר ויכולים להיות מעוכבים. לזמן אמת מלא צריך לחבר API שוק מקצועי בתשלום.",
         "starting_scan": "מתחיל סריקה...",
         "scanning": "סורק",
         "advisor_view": "מבט יועץ",
@@ -333,6 +352,8 @@ class AdvisorSettings:
     max_position_pct: float
     require_all_filters: bool
     min_market_cap: float
+    watchlist_auto_refresh: bool
+    watchlist_refresh_seconds: int
 
 
 def page_setup() -> None:
@@ -455,6 +476,52 @@ def fetch_market_snapshot(ticker: str, lookback_period: str = "1y") -> dict[str,
         "history": history,
         "info": info,
         "fast_info": fast_info,
+    }
+
+
+@st.cache_data(ttl=5)
+def fetch_watchlist_quote(ticker: str) -> dict[str, Any]:
+    stock = yf.Ticker(ticker)
+    fast_info: dict[str, Any] = {}
+    info: dict[str, Any] = {}
+    try:
+        fast_info = dict(stock.fast_info or {})
+    except Exception:
+        fast_info = {}
+    try:
+        info = stock.get_info() or {}
+    except Exception:
+        info = {}
+
+    price = first_number(
+        fast_info.get("last_price"),
+        info.get("currentPrice"),
+        info.get("regularMarketPrice"),
+    )
+    previous_close = first_number(
+        fast_info.get("previous_close"),
+        info.get("regularMarketPreviousClose"),
+        info.get("previousClose"),
+    )
+    if not price:
+        history = stock.history(period="2d", interval="1m")
+        if not history.empty:
+            price = float(history["Close"].dropna().iloc[-1])
+    if not previous_close:
+        daily = stock.history(period="5d", interval="1d")
+        closes = daily["Close"].dropna() if not daily.empty else pd.Series(dtype=float)
+        if len(closes) >= 2:
+            previous_close = float(closes.iloc[-2])
+
+    change = price - previous_close if price and previous_close else 0.0
+    change_pct = (change / previous_close) * 100 if previous_close else 0.0
+    return {
+        "ticker": ticker.upper(),
+        "price": price,
+        "previous_close": previous_close,
+        "change": change,
+        "change_pct": change_pct,
+        "updated_at": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
     }
 
 
@@ -1027,10 +1094,21 @@ def format_optional_number(value: Any) -> str:
     return "N/A"
 
 
-def render_watchlist(lang: str) -> None:
+def render_watchlist(lang: str, settings: AdvisorSettings) -> None:
     st.subheader(tr(lang, "watchlist"))
     st.caption(tr(lang, "watchlist_help"))
+    st.caption(tr(lang, "delayed_quotes"))
     ensure_watchlist()
+
+    if (
+        settings.watchlist_auto_refresh
+        and st.session_state.watchlist
+        and st_autorefresh is not None
+    ):
+        st_autorefresh(
+            interval=settings.watchlist_refresh_seconds * 1000,
+            key="watchlist_quote_refresh",
+        )
 
     with st.form("watchlist_form", clear_on_submit=True):
         col_a, col_b = st.columns([1, 3])
@@ -1046,13 +1124,42 @@ def render_watchlist(lang: str) -> None:
         return
 
     for index, row in enumerate(list(st.session_state.watchlist)):
-        col_ticker, col_notes, col_added, col_remove = st.columns([1, 4, 1.4, 1])
+        quote = fetch_watchlist_quote(row["Ticker"])
+        col_ticker, col_price, col_change, col_notes, col_added, col_remove = st.columns([1, 1.1, 1.1, 3, 1.4, 0.5])
         col_ticker.markdown(f"**{row['Ticker']}**")
+        col_price.markdown(f"**{tr(lang, 'live_price')}:** {format_quote_price(quote)}")
+        col_change.markdown(format_quote_change(quote), unsafe_allow_html=True)
         col_notes.write(row.get("Notes") or "-")
         col_added.caption(f"{tr(lang, 'added')}: {row.get('Added', '-')}")
+        col_added.caption(f"{tr(lang, 'quote_time')}: {quote.get('updated_at', '-')}")
         if col_remove.button(tr(lang, "remove_symbol"), key=f"remove_watchlist_{index}_{row['Ticker']}", help=tr(lang, "remove")):
             remove_from_watchlist(row["Ticker"])
             st.rerun()
+
+
+def format_quote_price(quote: dict[str, Any]) -> str:
+    price = quote.get("price")
+    if not price:
+        return "N/A"
+    return f"${float(price):,.2f}"
+
+
+def format_quote_change(quote: dict[str, Any]) -> str:
+    price = quote.get("price")
+    if not price:
+        return "<span style='color:#6b7280;'>N/A</span>"
+    change = float(quote.get("change") or 0)
+    change_pct = float(quote.get("change_pct") or 0)
+    if change >= 0:
+        color = "#15803d"
+        arrow = "▲"
+    else:
+        color = "#b91c1c"
+        arrow = "▼"
+    return (
+        f"<span style='color:{color};font-weight:800;font-size:1.05rem;'>"
+        f"{arrow} ${change:,.2f} ({change_pct:.2f}%)</span>"
+    )
 
 
 def ensure_watchlist() -> None:
@@ -1218,6 +1325,9 @@ def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
     stop_loss_pct = st.sidebar.slider(tr(lang, "stop_loss_pct"), 3.0, 20.0, defaults["stop"], 0.5)
     max_position_pct = st.sidebar.slider(tr(lang, "max_allocation"), 2.0, 40.0, defaults["max_position"], 1.0)
     require_all_filters = st.sidebar.toggle(tr(lang, "only_professional"), value=True)
+    st.sidebar.divider()
+    watchlist_auto_refresh = st.sidebar.toggle(tr(lang, "auto_refresh"), value=True)
+    watchlist_refresh_seconds = st.sidebar.slider(tr(lang, "refresh_seconds"), 5, 120, 15, 5)
 
     st.sidebar.divider()
     st.sidebar.caption(tr(lang, "optional_secrets"))
@@ -1231,6 +1341,8 @@ def sidebar_controls(lang: str) -> tuple[list[str], int, AdvisorSettings]:
         max_position_pct=float(max_position_pct),
         require_all_filters=bool(require_all_filters),
         min_market_cap=float(min_market_cap),
+        watchlist_auto_refresh=bool(watchlist_auto_refresh),
+        watchlist_refresh_seconds=int(watchlist_refresh_seconds),
     )
 
 
@@ -1292,7 +1404,7 @@ def main() -> None:
             st.caption(tr(lang, "diagnostics_wait"))
 
     st.divider()
-    render_watchlist(lang)
+    render_watchlist(lang, advisor_settings)
 
 
 if __name__ == "__main__":

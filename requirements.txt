@@ -4,3 +4,4 @@ pandas>=2.2
 numpy>=1.26
 requests>=2.32
 openai>=1.50
+streamlit-autorefresh>=1.0
