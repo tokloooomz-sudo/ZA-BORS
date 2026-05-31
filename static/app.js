@@ -57,7 +57,7 @@ function renderSignals(rows) {
       <thead>
         <tr>
           <th>+</th><th>סימול</th><th>מחיר</th><th>החלטת יועץ</th><th>ציון</th>
-          <th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיבה</th>
+          <th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיכון התרסקות</th><th>חדשה אחרונה</th><th>סיבה</th>
         </tr>
       </thead>
       <tbody>
@@ -71,6 +71,8 @@ function renderSignals(rows) {
             <td>${num(row.rsi)}</td>
             <td>${num(row.distance)}%</td>
             <td>${row.positiveCatalyst ? "כן" : "לא"}</td>
+            <td class="${riskClass(row.riskScore)}">${row.riskScore || 0}/100<br><small>${row.riskText || ""}</small></td>
+            <td>${row.latestNews || ""}</td>
             <td>${row.reason}</td>
           </tr>
         `).join("")}
@@ -232,6 +234,11 @@ function priceClass(change) {
   if (change > 0) return "price-up";
   if (change < 0) return "price-down";
   return "price-flat";
+}
+function riskClass(score) {
+  if (Number(score || 0) >= 65) return "price-down";
+  if (Number(score || 0) >= 35) return "price-flat";
+  return "price-up";
 }
 function money(value) { return `$${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`; }
 function num(value) { return Number(value || 0).toFixed(2); }

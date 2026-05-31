@@ -26,6 +26,53 @@ WATCHLIST_PATH = DATA_DIR / "watchlist.json"
 BLINK_UNIVERSE_PATH = DATA_DIR / "blink_universe.csv"
 SESSION_MAX_AGE = 60 * 60 * 12
 
+POSITIVE_NEWS_TERMS = {
+    "approval": 18,
+    "approved": 18,
+    "fda approval": 24,
+    "contract": 18,
+    "deal": 16,
+    "agreement": 14,
+    "partnership": 16,
+    "investment": 18,
+    "funding": 18,
+    "financing": 14,
+    "cash infusion": 24,
+    "strategic investment": 24,
+    "buyout": 26,
+    "acquisition": 22,
+    "merger": 20,
+    "takeover": 24,
+    "asset sale": 14,
+    "sale": 10,
+    "beats": 16,
+    "beat": 14,
+    "raises guidance": 20,
+    "guidance raised": 20,
+    "launch": 12,
+    "breakthrough": 20,
+    "upgrade": 10,
+}
+
+NEGATIVE_NEWS_TERMS = {
+    "bankruptcy": 35,
+    "delisting": 32,
+    "going concern": 30,
+    "sec investigation": 28,
+    "investigation": 18,
+    "lawsuit": 14,
+    "fraud": 35,
+    "offering": 18,
+    "dilution": 24,
+    "downgrade": 12,
+    "misses": 16,
+    "missed": 14,
+    "cuts guidance": 22,
+    "guidance cut": 22,
+    "halts": 26,
+    "halted": 26,
+}
+
 app = FastAPI(title="ZA-BORS")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Environment(
@@ -245,12 +292,14 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
     exchange_ok = any(code in exchange.upper() for code in ["NMS", "NYQ", "NGM", "NCM", "NASDAQ", "NYSE"])
     cap_ok = req.min_market_cap <= 0 or market_cap >= req.min_market_cap
     affordable = price > 0 and int(req.max_investment // price) >= 1
-    catalyst = keyword_catalyst(stock.news if hasattr(stock, "news") else [])
-    score = score_stock(rsi, distance, market_cap, catalyst, affordable)
+    news_signal = analyze_news(stock.news if hasattr(stock, "news") else [])
+    technical_risk = crash_risk(close, price, high_52, change_pct, rsi)
+    catalyst = news_signal["positive"] and not news_signal["negative"]
+    score = score_stock(rsi, distance, market_cap, news_signal, technical_risk, affordable)
     verdict = "כדאי מאוד" if score >= 80 else "כדאי לעקוב" if score >= 65 else "לא כדאי עכשיו"
-    if not exchange_ok or not cap_ok or not affordable:
+    if not exchange_ok or not cap_ok or not affordable or technical_risk["avoid"]:
         verdict = "לא כדאי עכשיו"
-    reason = reason_text(exchange_ok, cap_ok, affordable, catalyst, rsi, distance)
+    reason = reason_text(exchange_ok, cap_ok, affordable, news_signal, technical_risk, rsi, distance)
     return {
         "ticker": ticker,
         "name": info.get("shortName") or info.get("longName") or ticker,
@@ -264,6 +313,11 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
         "score": score,
         "verdict": verdict,
         "positiveCatalyst": catalyst,
+        "newsScore": news_signal["score"],
+        "riskScore": technical_risk["score"],
+        "catalystText": news_signal["summary"],
+        "riskText": technical_risk["summary"],
+        "latestNews": news_signal["latest"],
         "reason": reason,
     }
 
@@ -344,33 +398,119 @@ def compute_rsi(close: pd.Series, period: int = 14) -> float:
     return value if np.isfinite(value) else 50.0
 
 
-def keyword_catalyst(news_items: list[dict[str, Any]]) -> bool:
-    text = " ".join(str(item.get("title", "")) for item in news_items[:6]).lower()
-    return any(term in text for term in ["beat", "beats", "approval", "contract", "partnership", "launch", "guidance", "surge"])
+def analyze_news(news_items: list[dict[str, Any]]) -> dict[str, Any]:
+    titles = []
+    for item in news_items[:8]:
+        title = str(item.get("title") or item.get("content", {}).get("title") or "").strip()
+        if title:
+            titles.append(title)
+
+    text = " ".join(titles).lower()
+    positive_hits = [(term, weight) for term, weight in POSITIVE_NEWS_TERMS.items() if term in text]
+    negative_hits = [(term, weight) for term, weight in NEGATIVE_NEWS_TERMS.items() if term in text]
+    positive_score = sum(weight for _, weight in positive_hits)
+    negative_score = sum(weight for _, weight in negative_hits)
+    score = max(-60, min(60, positive_score - negative_score))
+
+    if positive_hits and not negative_hits:
+        summary = f"נמצאה אפשרות לחדשות חיוביות: {', '.join(term for term, _ in positive_hits[:3])}."
+    elif positive_hits and negative_hits:
+        summary = f"יש חדשות מעורבות: חיובי ({positive_hits[0][0]}) מול סיכון ({negative_hits[0][0]})."
+    elif negative_hits:
+        summary = f"נמצאו סימני חדשות שליליות: {', '.join(term for term, _ in negative_hits[:3])}."
+    else:
+        summary = "לא נמצאה כרגע חדשה חיובית חזקה שמסבירה עלייה קרובה."
+
+    return {
+        "positive": positive_score >= 16,
+        "negative": negative_score >= 18,
+        "score": score,
+        "summary": summary,
+        "latest": titles[0] if titles else "אין כותרת חדשות זמינה.",
+    }
 
 
-def score_stock(rsi: float, distance: float, market_cap: float, catalyst: bool, affordable: bool) -> int:
+def crash_risk(close: pd.Series, price: float, high_52: float, change_pct: float, rsi: float) -> dict[str, Any]:
+    if close.empty or len(close) < 30 or not price:
+        return {"avoid": False, "score": 0, "summary": "אין מספיק היסטוריה כדי לאבחן התרסקות."}
+
+    latest = float(close.iloc[-1])
+    close_5d = float(close.iloc[-6]) if len(close) >= 6 else latest
+    close_20d = float(close.iloc[-21]) if len(close) >= 21 else latest
+    close_60d = float(close.iloc[-61]) if len(close) >= 61 else latest
+    ma50 = float(close.tail(50).mean()) if len(close) >= 50 else latest
+    ma200 = float(close.tail(200).mean()) if len(close) >= 200 else ma50
+
+    drop_5d = ((close_5d - latest) / close_5d) * 100 if close_5d else 0
+    drop_20d = ((close_20d - latest) / close_20d) * 100 if close_20d else 0
+    drop_60d = ((close_60d - latest) / close_60d) * 100 if close_60d else 0
+    drop_from_high = ((high_52 - price) / high_52) * 100 if high_52 else 0
+
+    risk = 0
+    reasons = []
+    if drop_5d >= 12:
+        risk += 25
+        reasons.append(f"ירידה של {drop_5d:.1f}% ב-5 ימים")
+    if drop_20d >= 25:
+        risk += 30
+        reasons.append(f"ירידה של {drop_20d:.1f}% בחודש")
+    if drop_60d >= 45:
+        risk += 25
+        reasons.append(f"ירידה של {drop_60d:.1f}% ב-3 חודשים")
+    if drop_from_high >= 70:
+        risk += 20
+        reasons.append(f"{drop_from_high:.1f}% מתחת לשיא")
+    if latest < ma50 < ma200:
+        risk += 20
+        reasons.append("המניה מתחת לממוצעי 50 ו-200 יום")
+    if change_pct <= -8:
+        risk += 15
+        reasons.append("ירידה יומית חדה")
+    if rsi < 18 and drop_20d >= 20:
+        risk += 15
+        reasons.append("RSI נמוך מאוד יחד עם נפילה מהירה")
+
+    risk = int(max(0, min(100, risk)))
+    avoid = risk >= 65
+    summary = " | ".join(reasons[:3]) if reasons else "לא זוהתה התרסקות טכנית חריגה."
+    return {"avoid": avoid, "score": risk, "summary": summary}
+
+
+def score_stock(rsi: float, distance: float, market_cap: float, news_signal: dict[str, Any], technical_risk: dict[str, Any], affordable: bool) -> int:
     rsi_score = max(0, min(100, 100 - max(0, rsi - 35) * 2))
     dip_score = max(0, min(100, distance * 3))
     cap_score = max(0, min(100, market_cap / 1_000_000_000 * 10))
-    score = rsi_score * 0.25 + dip_score * 0.3 + cap_score * 0.15 + (25 if catalyst else 0) + (10 if affordable else -25)
+    news_score = float(news_signal.get("score") or 0)
+    risk_score = float(technical_risk.get("score") or 0)
+    score = (
+        rsi_score * 0.2
+        + dip_score * 0.25
+        + cap_score * 0.1
+        + max(-35, min(35, news_score))
+        - risk_score * 0.45
+        + (10 if affordable else -25)
+    )
     return int(max(0, min(100, round(score))))
 
 
-def reason_text(exchange_ok: bool, cap_ok: bool, affordable: bool, catalyst: bool, rsi: float, distance: float) -> str:
+def reason_text(exchange_ok: bool, cap_ok: bool, affordable: bool, news_signal: dict[str, Any], technical_risk: dict[str, Any], rsi: float, distance: float) -> str:
     if not exchange_ok:
         return "לא נסחרת בבורסה מתאימה."
     if not cap_ok:
         return "שווי שוק נמוך מהרף שבחרת."
     if not affordable:
         return "מחיר המניה לא מתאים לטווח ההשקעה שלך."
-    if not catalyst:
-        return "לא נמצא קטליזטור חיובי ממשי."
+    if technical_risk.get("avoid"):
+        return f"להתרחק כרגע: זוהה סיכון התרסקות ({technical_risk.get('summary')})."
+    if news_signal.get("negative"):
+        return f"לא כדאי עכשיו: החדשות כוללות סיכון שלילי ({news_signal.get('summary')})."
+    if not news_signal.get("positive"):
+        return "לא נמצא קטליזטור חיובי ממשי לפי החדשות האחרונות."
     if rsi > 45:
         return "RSI גבוה יחסית, לא מספיק buy-low."
     if distance < 10:
         return "המחיר לא רחוק מספיק משיא 52 שבועות."
-    return "עבר את כל הסינונים."
+    return f"הזדמנות אפשרית: ירידה במחיר יחד עם קטליזטור חדשות חיובי. {news_signal.get('summary')}"
 
 
 def verdict_order(verdict: str) -> int:

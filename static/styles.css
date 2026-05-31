@@ -109,6 +109,13 @@ th, td {
   vertical-align: middle;
 }
 th { color: var(--muted); font-size: 13px; }
+td small {
+  display: block;
+  max-width: 260px;
+  color: var(--muted);
+  font-weight: 600;
+  line-height: 1.5;
+}
 .verdict-strong { color: var(--green); font-weight: 900; }
 .verdict-watch { color: var(--yellow); font-weight: 900; }
 .verdict-avoid { color: var(--red); font-weight: 900; }
