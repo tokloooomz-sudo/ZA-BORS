@@ -319,6 +319,7 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
         "riskText": technical_risk["summary"],
         "latestNews": news_signal["latest"],
         "reason": reason,
+        "scoreExplanation": score_explanation(rsi, distance, news_signal, technical_risk, affordable),
     }
 
 
@@ -511,6 +512,41 @@ def reason_text(exchange_ok: bool, cap_ok: bool, affordable: bool, news_signal: 
     if distance < 10:
         return "המחיר לא רחוק מספיק משיא 52 שבועות."
     return f"הזדמנות אפשרית: ירידה במחיר יחד עם קטליזטור חדשות חיובי. {news_signal.get('summary')}"
+
+
+def score_explanation(rsi: float, distance: float, news_signal: dict[str, Any], technical_risk: dict[str, Any], affordable: bool) -> str:
+    parts = []
+    if news_signal.get("positive") and not news_signal.get("negative"):
+        parts.append("חדשות חיוביות מחזקות את הסיכוי לעלייה")
+    elif news_signal.get("negative"):
+        parts.append("חדשות שליליות הורידו את הציון")
+    else:
+        parts.append("אין כרגע קטליזטור חדשות חזק")
+
+    if 25 <= rsi <= 45:
+        parts.append(f"RSI {rsi:.1f} מתאים ל-buy low")
+    elif rsi > 55:
+        parts.append(f"RSI {rsi:.1f} גבוה יחסית")
+    else:
+        parts.append(f"RSI {rsi:.1f}")
+
+    if distance >= 10:
+        parts.append(f"{distance:.1f}% מתחת לשיא 52 שבועות")
+    else:
+        parts.append("לא מספיק רחוקה מהשיא")
+
+    risk_score = int(technical_risk.get("score") or 0)
+    if risk_score >= 65:
+        parts.append("סיכון התרסקות גבוה")
+    elif risk_score >= 35:
+        parts.append("סיכון בינוני")
+    else:
+        parts.append("סיכון התרסקות נמוך")
+
+    if not affordable:
+        parts.append("מחוץ לטווח ההשקעה שבחרת")
+
+    return " | ".join(parts)
 
 
 def verdict_order(verdict: str) -> int:

@@ -57,7 +57,7 @@ function renderSignals(rows) {
       <thead>
         <tr>
           <th>+</th><th>סימול</th><th>מחיר</th><th>החלטת יועץ</th><th>ציון</th>
-          <th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיכון התרסקות</th><th>חדשה אחרונה</th><th>סיבה</th>
+          <th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיכון התרסקות</th><th>חדשה אחרונה</th><th>הסבר ציון</th><th>סיבה</th>
         </tr>
       </thead>
       <tbody>
@@ -73,6 +73,7 @@ function renderSignals(rows) {
             <td>${row.positiveCatalyst ? "כן" : "לא"}</td>
             <td class="${riskClass(row.riskScore)}">${row.riskScore || 0}/100<br><small>${row.riskText || ""}</small></td>
             <td>${row.latestNews || ""}</td>
+            <td><small>${row.scoreExplanation || ""}</small></td>
             <td>${row.reason}</td>
           </tr>
         `).join("")}
