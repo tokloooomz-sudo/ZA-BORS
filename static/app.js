@@ -195,20 +195,22 @@ function renderWatchlist(items) {
   watchlistEl.innerHTML = `
     <table>
       <thead>
-        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>מחיר קנייה</th><th>רווח/הפסד חי</th><th>הערה</th></tr>
+        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>מחיר קנייה</th><th>שמירה</th><th>רווח/הפסד חי</th><th>הערה</th></tr>
       </thead>
       <tbody>
       ${items.map(item => {
         const q = item.quote;
         const pl = livePL(item, q);
+        const notes = escapeAttr(item.Notes || "");
         return `
           <tr>
             <td><button onclick="removeTicker('${item.Ticker}')">-</button></td>
-            <td><input type="checkbox" ${item.Owned ? "checked" : ""} onchange="updateTicker('${item.Ticker}', this.checked, ${item.BuyPrice || 0}, '${escapeAttr(item.Notes || "")}')" /></td>
+            <td><input id="owned-${item.Ticker}" type="checkbox" ${item.Owned ? "checked" : ""} onchange="saveWatchRow('${item.Ticker}', '${notes}')" /></td>
             <td>${item.Ticker}</td>
             <td class="${priceClass(q.change)}">${money(q.price)}</td>
             <td class="${priceClass(q.change)}">${q.change >= 0 ? "▲" : "▼"} ${money(q.change)} (${num(q.changePct)}%)</td>
-            <td><input type="number" value="${item.BuyPrice || 0}" min="0" step="0.01" onchange="updateTicker('${item.Ticker}', ${item.Owned ? "true" : "false"}, this.value, '${escapeAttr(item.Notes || "")}')" /></td>
+            <td><input id="buy-${item.Ticker}" class="buy-price-input" type="number" value="${item.BuyPrice || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
+            <td><button type="button" class="save-row-button" onclick="saveWatchRow('${item.Ticker}', '${notes}')">שמור</button></td>
             <td class="${priceClass(pl.amount)}">${pl.text}</td>
             <td>${item.Notes || ""}</td>
           </tr>
@@ -219,6 +221,12 @@ function renderWatchlist(items) {
   `;
 }
 
+async function saveWatchRow(ticker, notes) {
+  const owned = document.querySelector(`#owned-${ticker}`).checked;
+  const buyPrice = document.querySelector(`#buy-${ticker}`).value;
+  await updateTicker(ticker, owned, buyPrice, notes);
+  statusEl.textContent = `מחיר הקנייה של ${ticker} נשמר`;
+}
 async function updateTicker(ticker, owned, buyPrice, notes) {
   await withLoading(async () => {
     await apiFetch(`/api/watchlist/${ticker}`, {
@@ -363,3 +371,4 @@ loadWatchlist();
 setInterval(() => loadWatchlist(false), 60000);
 setInterval(keepServerAwake, 10 * 60 * 1000);
 setInterval(refreshAppQuietly, 30 * 60 * 1000);
+
