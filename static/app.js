@@ -56,7 +56,7 @@ async function scan() {
     });
     const data = await res.json();
     renderSignals(data.rows);
-    statusEl.textContent = `נמצאו ${data.rows.length} מתוך ${data.scanned || data.rows.length} מניות בטווח המחיר`;
+    statusEl.textContent = `נמצאו ${data.rows.length} מניות שכדאי מאוד או כדאי לעקוב מתוך ${data.scanned || data.rows.length} שנסרקו`;
   });
 }
 
@@ -113,8 +113,8 @@ function renderSignals(rows) {
   if (!rows.length) {
     signalsEl.innerHTML = `
       <div class="empty-state">
-        <h3>לא נמצאו מניות בטווח שבחרת</h3>
-        <p>נסה להרחיב את מחיר המניה המקסימלי או להוריד את שווי השוק המינימלי.</p>
+        <h3>לא נמצאו מניות שכדאי לפעול עליהן כרגע</h3>
+        <p>כל המניות שנסרקו יצאו "לא כדאי עכשיו", מחוץ לטווח המחיר, או בסיכון גבוה.</p>
       </div>
     `;
     return;

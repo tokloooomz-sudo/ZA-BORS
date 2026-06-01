@@ -343,7 +343,7 @@ def scan(req: ScanRequest, _: str = Depends(require_login)) -> JSONResponse:
     for ticker in universe_df["ticker"].tolist():
         try:
             row = scan_one(str(ticker), req)
-            if row["priceInRange"]:
+            if row["priceInRange"] and row["verdict"] in ACTIONABLE_VERDICTS:
                 rows.append(row)
         except Exception as exc:
             continue
