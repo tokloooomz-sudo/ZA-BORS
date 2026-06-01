@@ -4,6 +4,7 @@ const watchlistEl = document.querySelector("#watchlist");
 const sellAlertsEl = document.querySelector("#sellAlerts");
 const loadingBar = document.querySelector("#loadingBar");
 const authToken = sessionStorage.getItem("zaBorsToken");
+const WATCHLIST_BACKUP_KEY = "zaBorsWatchlistBackup";
 
 if (!authToken) {
   window.location.href = "/";
@@ -27,7 +28,7 @@ document.querySelector("#watchForm").addEventListener("submit", async (event) =>
       })
     });
     event.target.reset();
-    await loadWatchlist(false);
+    await loadWatchlist(false, true);
   });
 });
 
@@ -99,7 +100,7 @@ async function addTicker(ticker, price) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ticker, buy_price: price, owned: false, notes: "Added from scan" })
     });
-    await loadWatchlist(false);
+    await loadWatchlist(false, true);
   });
 
   const row = document.querySelector(`[data-ticker="${ticker}"]`);
@@ -112,12 +113,22 @@ async function addTicker(ticker, price) {
 
 let watchedTickers = new Set();
 
-async function loadWatchlist(showLoading = false) {
+async function loadWatchlist(showLoading = false, restoreFromBackup = true) {
   if (showLoading) startLoading();
   try {
     const res = await apiFetch("/api/watchlist");
-    const data = await res.json();
+    let data = await res.json();
+    const backup = readWatchlistBackup();
+
+    if (restoreFromBackup && (!data.items || data.items.length === 0) && backup.length > 0) {
+      await restoreWatchlistBackup(backup);
+      const restoredRes = await apiFetch("/api/watchlist");
+      data = await restoredRes.json();
+      statusEl.textContent = "רשימת המעקב שוחזרה מהגיבוי המקומי";
+    }
+
     watchedTickers = new Set(data.items.map(item => item.Ticker));
+    saveWatchlistBackup(data.items);
     renderAlerts(data);
     renderWatchlist(data.items);
   } finally {
@@ -173,15 +184,50 @@ async function updateTicker(ticker, owned, buyPrice, notes) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ticker, owned, buy_price: Number(buyPrice || 0), notes })
     });
-    await loadWatchlist(false);
+    await loadWatchlist(false, false);
   });
 }
 
 async function removeTicker(ticker) {
   await withLoading(async () => {
     await apiFetch(`/api/watchlist/${ticker}`, { method: "DELETE" });
-    await loadWatchlist(false);
+    await loadWatchlist(false, false);
   });
+}
+
+function readWatchlistBackup() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(WATCHLIST_BACKUP_KEY) || "[]");
+    return Array.isArray(rows) ? rows.filter(row => row && row.Ticker) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveWatchlistBackup(items) {
+  const clean = (items || []).map(item => ({
+    Ticker: String(item.Ticker || "").toUpperCase(),
+    Notes: item.Notes || "",
+    BuyPrice: Number(item.BuyPrice || 0),
+    Owned: Boolean(item.Owned)
+  })).filter(item => item.Ticker);
+
+  localStorage.setItem(WATCHLIST_BACKUP_KEY, JSON.stringify(clean));
+}
+
+async function restoreWatchlistBackup(items) {
+  for (const item of items) {
+    await apiFetch("/api/watchlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ticker: item.Ticker,
+        buy_price: Number(item.BuyPrice || 0),
+        owned: Boolean(item.Owned),
+        notes: item.Notes || "Restored from local backup"
+      })
+    });
+  }
 }
 
 function livePL(item, quote) {
