@@ -91,8 +91,8 @@ class WatchItem(BaseModel):
 class ScanRequest(BaseModel):
     tickers: int = 100
     min_market_cap: float = 50_000_000
-    min_investment: float = 100
-    max_investment: float = 1000
+    min_investment: float = 5
+    max_investment: float = 100
 
 
 def auth_settings() -> tuple[str | None, str | None]:
@@ -204,8 +204,13 @@ def get_watchlist(_: str = Depends(require_login)) -> dict[str, Any]:
     rows = load_watchlist()
     enriched = []
     for row in rows:
-        quote = fetch_quote(row["Ticker"])
-        enriched.append({**row, "quote": quote, "alerts": item_alerts(row, quote)})
+        try:
+            quote = fetch_quote(row["Ticker"])
+            alerts = item_alerts(row, quote)
+        except Exception as exc:
+            quote = {"price": 0, "change": 0, "changePct": 0, "updatedAt": "N/A", "error": str(exc)}
+            alerts = [f"{row['Ticker']}: לא הצלחתי להביא מחיר כרגע, אבל המניה נשארת ברשימת המעקב."]
+        enriched.append({**row, "quote": quote, "alerts": alerts})
     return {"items": enriched, "market": market_risk()}
 
 
@@ -254,24 +259,20 @@ def delete_watchlist(ticker: str, _: str = Depends(require_login)) -> dict[str, 
 
 @app.post("/api/scan")
 def scan(req: ScanRequest, _: str = Depends(require_login)) -> JSONResponse:
+    if req.max_investment < req.min_investment:
+        req.min_investment, req.max_investment = req.max_investment, req.min_investment
+
     universe_df = pd.read_csv(BLINK_UNIVERSE_PATH).head(min(max(req.tickers, 1), 100))
     rows = []
     for ticker in universe_df["ticker"].tolist():
         try:
-            rows.append(scan_one(str(ticker), req))
+            row = scan_one(str(ticker), req)
+            if row["priceInRange"]:
+                rows.append(row)
         except Exception as exc:
-            rows.append(
-                {
-                    "ticker": ticker,
-                    "price": 0,
-                    "verdict": "לא כדאי עכשיו",
-                    "score": 0,
-                    "reason": f"שגיאה בנתונים: {exc}",
-                    "positiveCatalyst": False,
-                }
-            )
+            continue
     rows.sort(key=lambda row: (verdict_order(row["verdict"]), -row["score"]))
-    return JSONResponse({"rows": rows})
+    return JSONResponse({"rows": rows, "scanned": len(universe_df)})
 
 
 def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
@@ -291,15 +292,15 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
     exchange = str(info.get("exchange") or info.get("fullExchangeName") or "")
     exchange_ok = any(code in exchange.upper() for code in ["NMS", "NYQ", "NGM", "NCM", "NASDAQ", "NYSE"])
     cap_ok = req.min_market_cap <= 0 or market_cap >= req.min_market_cap
-    affordable = price > 0 and int(req.max_investment // price) >= 1
+    price_in_range = price > 0 and req.min_investment <= price <= req.max_investment
     news_signal = analyze_news(stock.news if hasattr(stock, "news") else [])
     technical_risk = crash_risk(close, price, high_52, change_pct, rsi)
     catalyst = news_signal["positive"] and not news_signal["negative"]
-    score = score_stock(rsi, distance, market_cap, news_signal, technical_risk, affordable)
+    score = score_stock(rsi, distance, market_cap, news_signal, technical_risk, price_in_range)
     verdict = "כדאי מאוד" if score >= 80 else "כדאי לעקוב" if score >= 65 else "לא כדאי עכשיו"
-    if not exchange_ok or not cap_ok or not affordable or technical_risk["avoid"]:
+    if not exchange_ok or not cap_ok or not price_in_range or technical_risk["avoid"]:
         verdict = "לא כדאי עכשיו"
-    reason = reason_text(exchange_ok, cap_ok, affordable, news_signal, technical_risk, rsi, distance)
+    reason = reason_text(exchange_ok, cap_ok, price_in_range, news_signal, technical_risk, rsi, distance)
     return {
         "ticker": ticker,
         "name": info.get("shortName") or info.get("longName") or ticker,
@@ -313,13 +314,14 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
         "score": score,
         "verdict": verdict,
         "positiveCatalyst": catalyst,
+        "priceInRange": price_in_range,
         "newsScore": news_signal["score"],
         "riskScore": technical_risk["score"],
         "catalystText": news_signal["summary"],
         "riskText": technical_risk["summary"],
         "latestNews": news_signal["latest"],
         "reason": reason,
-        "scoreExplanation": score_explanation(rsi, distance, news_signal, technical_risk, affordable),
+        "scoreExplanation": score_explanation(rsi, distance, news_signal, technical_risk, price_in_range),
     }
 
 
@@ -477,7 +479,7 @@ def crash_risk(close: pd.Series, price: float, high_52: float, change_pct: float
     return {"avoid": avoid, "score": risk, "summary": summary}
 
 
-def score_stock(rsi: float, distance: float, market_cap: float, news_signal: dict[str, Any], technical_risk: dict[str, Any], affordable: bool) -> int:
+def score_stock(rsi: float, distance: float, market_cap: float, news_signal: dict[str, Any], technical_risk: dict[str, Any], price_in_range: bool) -> int:
     rsi_score = max(0, min(100, 100 - max(0, rsi - 35) * 2))
     dip_score = max(0, min(100, distance * 3))
     cap_score = max(0, min(100, market_cap / 1_000_000_000 * 10))
@@ -489,18 +491,18 @@ def score_stock(rsi: float, distance: float, market_cap: float, news_signal: dic
         + cap_score * 0.1
         + max(-35, min(35, news_score))
         - risk_score * 0.45
-        + (10 if affordable else -25)
+        + (10 if price_in_range else -35)
     )
     return int(max(0, min(100, round(score))))
 
 
-def reason_text(exchange_ok: bool, cap_ok: bool, affordable: bool, news_signal: dict[str, Any], technical_risk: dict[str, Any], rsi: float, distance: float) -> str:
+def reason_text(exchange_ok: bool, cap_ok: bool, price_in_range: bool, news_signal: dict[str, Any], technical_risk: dict[str, Any], rsi: float, distance: float) -> str:
     if not exchange_ok:
         return "לא נסחרת בבורסה מתאימה."
     if not cap_ok:
         return "שווי שוק נמוך מהרף שבחרת."
-    if not affordable:
-        return "מחיר המניה לא מתאים לטווח ההשקעה שלך."
+    if not price_in_range:
+        return "מחיר המניה מחוץ לטווח המחיר שבחרת."
     if technical_risk.get("avoid"):
         return f"להתרחק כרגע: זוהה סיכון התרסקות ({technical_risk.get('summary')})."
     if news_signal.get("negative"):
@@ -514,7 +516,7 @@ def reason_text(exchange_ok: bool, cap_ok: bool, affordable: bool, news_signal: 
     return f"הזדמנות אפשרית: ירידה במחיר יחד עם קטליזטור חדשות חיובי. {news_signal.get('summary')}"
 
 
-def score_explanation(rsi: float, distance: float, news_signal: dict[str, Any], technical_risk: dict[str, Any], affordable: bool) -> str:
+def score_explanation(rsi: float, distance: float, news_signal: dict[str, Any], technical_risk: dict[str, Any], price_in_range: bool) -> str:
     parts = []
     if news_signal.get("positive") and not news_signal.get("negative"):
         parts.append("חדשות חיוביות מחזקות את הסיכוי לעלייה")
@@ -543,8 +545,8 @@ def score_explanation(rsi: float, distance: float, news_signal: dict[str, Any], 
     else:
         parts.append("סיכון התרסקות נמוך")
 
-    if not affordable:
-        parts.append("מחוץ לטווח ההשקעה שבחרת")
+    if not price_in_range:
+        parts.append("מחוץ לטווח מחיר המניה שבחרת")
 
     return " | ".join(parts)
 

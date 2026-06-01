@@ -146,6 +146,16 @@ td small {
 .watched {
   background: #ffe4ef;
 }
+.empty-state {
+  padding: 26px;
+  text-align: center;
+}
+.empty-state h3 {
+  margin: 0 0 8px;
+}
+.empty-state p {
+  margin: 0;
+}
 .login-page {
   min-height: 100vh;
   background:

@@ -37,8 +37,8 @@ async function scan() {
     const payload = {
       tickers: Number(document.querySelector("#tickerCount").value || 100),
       min_market_cap: Number(document.querySelector("#marketCap").value),
-      min_investment: Number(document.querySelector("#minInvestment").value || 100),
-      max_investment: Number(document.querySelector("#maxInvestment").value || 1000)
+      min_investment: Number(document.querySelector("#minInvestment").value || 5),
+      max_investment: Number(document.querySelector("#maxInvestment").value || 100)
     };
     const res = await apiFetch("/api/scan", {
       method: "POST",
@@ -47,11 +47,21 @@ async function scan() {
     });
     const data = await res.json();
     renderSignals(data.rows);
-    statusEl.textContent = `נסרקו ${data.rows.length} מניות`;
+    statusEl.textContent = `נמצאו ${data.rows.length} מתוך ${data.scanned || data.rows.length} מניות בטווח המחיר`;
   });
 }
 
 function renderSignals(rows) {
+  if (!rows.length) {
+    signalsEl.innerHTML = `
+      <div class="empty-state">
+        <h3>לא נמצאו מניות בטווח שבחרת</h3>
+        <p>נסה להרחיב את מחיר המניה המקסימלי או להוריד את שווי השוק המינימלי.</p>
+      </div>
+    `;
+    return;
+  }
+
   signalsEl.innerHTML = `
     <table>
       <thead>
