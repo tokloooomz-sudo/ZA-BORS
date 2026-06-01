@@ -50,6 +50,7 @@
         if (response.ok) {
           const data = await response.json();
           localStorage.setItem("zaBorsToken", data.token);
+          sessionStorage.setItem("zaBorsToken", data.token);
           window.location.href = "/app";
           return;
         }

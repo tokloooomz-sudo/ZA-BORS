@@ -5,13 +5,16 @@ const sellAlertsEl = document.querySelector("#sellAlerts");
 const loadingBar = document.querySelector("#loadingBar");
 const searchForm = document.querySelector("#stockSearchForm");
 const searchResultsEl = document.querySelector("#stockSearchResults");
-const authToken = localStorage.getItem("zaBorsToken");
+let authToken = localStorage.getItem("zaBorsToken") || sessionStorage.getItem("zaBorsToken");
 const WATCHLIST_BACKUP_KEY = "zaBorsWatchlistBackup";
 
 if (!authToken) {
   window.location.href = "/";
   throw new Error("Login required");
 }
+
+localStorage.setItem("zaBorsToken", authToken);
+sessionStorage.setItem("zaBorsToken", authToken);
 
 document.querySelector("#scanButton").addEventListener("click", scan);
 document.querySelector("#refreshWatchlist").addEventListener("click", () => loadWatchlist(true));
@@ -299,6 +302,7 @@ async function apiFetch(url, options) {
   const response = await fetch(url, mergedOptions);
   if (response.status === 401) {
     localStorage.removeItem("zaBorsToken");
+    sessionStorage.removeItem("zaBorsToken");
     window.location.href = "/";
     throw new Error("Login required");
   }
@@ -307,6 +311,7 @@ async function apiFetch(url, options) {
 
 async function logout() {
   localStorage.removeItem("zaBorsToken");
+  sessionStorage.removeItem("zaBorsToken");
   await fetch("/api/logout", { method: "POST" });
   window.location.href = "/";
 }
