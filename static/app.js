@@ -28,6 +28,7 @@ document.querySelector("#watchForm").addEventListener("submit", async (event) =>
       body: JSON.stringify({
         ticker: document.querySelector("#watchTicker").value,
         buy_price: Number(document.querySelector("#watchBuyPrice").value || 0),
+        invested_amount: Number(document.querySelector("#watchInvestedAmount").value || 0),
         owned: document.querySelector("#watchOwned").checked,
         notes: document.querySelector("#watchNotes").value
       })
@@ -152,7 +153,7 @@ async function addTicker(ticker, price) {
     await apiFetch("/api/watchlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticker, buy_price: price, owned: false, notes: "Added from scan" })
+      body: JSON.stringify({ ticker, buy_price: price, invested_amount: 0, owned: false, notes: "Added from scan" })
     });
     await loadWatchlist(false, true);
   });
@@ -207,7 +208,7 @@ function renderWatchlist(items) {
   watchlistEl.innerHTML = `
     <table>
       <thead>
-        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>מחיר קנייה</th><th>שמירה</th><th>רווח/הפסד חי</th><th>הערה</th></tr>
+        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
       </thead>
       <tbody>
       ${items.map(item => {
@@ -222,6 +223,7 @@ function renderWatchlist(items) {
             <td class="${priceClass(q.change)}">${money(q.price)}</td>
             <td class="${priceClass(q.change)}">${q.change >= 0 ? "▲" : "▼"} ${money(q.change)} (${num(q.changePct)}%)</td>
             <td><input id="buy-${item.Ticker}" class="buy-price-input" type="number" value="${item.BuyPrice || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
+            <td><input id="invested-${item.Ticker}" class="buy-price-input" type="number" value="${item.InvestedAmount || 0}" min="0" step="0.01" inputmode="decimal" placeholder="1000" /></td>
             <td><button type="button" class="save-row-button" onclick="saveWatchRow('${item.Ticker}', '${notes}')">שמור</button></td>
             <td class="${priceClass(pl.amount)}">${pl.text}</td>
             <td>${item.Notes || ""}</td>
@@ -236,15 +238,17 @@ function renderWatchlist(items) {
 async function saveWatchRow(ticker, notes) {
   const owned = document.querySelector(`#owned-${ticker}`).checked;
   const buyPrice = document.querySelector(`#buy-${ticker}`).value;
-  await updateTicker(ticker, owned, buyPrice, notes);
+  const investedAmount = document.querySelector(`#invested-${ticker}`).value;
+  await updateTicker(ticker, owned, buyPrice, investedAmount, notes);
   statusEl.textContent = `מחיר הקנייה של ${ticker} נשמר`;
 }
-async function updateTicker(ticker, owned, buyPrice, notes) {
+
+async function updateTicker(ticker, owned, buyPrice, investedAmount, notes) {
   await withLoading(async () => {
     await apiFetch(`/api/watchlist/${ticker}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticker, owned, buy_price: Number(buyPrice || 0), notes })
+      body: JSON.stringify({ ticker, owned, buy_price: Number(buyPrice || 0), invested_amount: Number(investedAmount || 0), notes })
     });
     await loadWatchlist(false, false);
   });
@@ -271,6 +275,7 @@ function saveWatchlistBackup(items) {
     Ticker: String(item.Ticker || "").toUpperCase(),
     Notes: item.Notes || "",
     BuyPrice: Number(item.BuyPrice || 0),
+    InvestedAmount: Number(item.InvestedAmount || 0),
     Owned: Boolean(item.Owned)
   })).filter(item => item.Ticker);
 
@@ -285,6 +290,7 @@ async function restoreWatchlistBackup(items) {
       body: JSON.stringify({
         ticker: item.Ticker,
         buy_price: Number(item.BuyPrice || 0),
+        invested_amount: Number(item.InvestedAmount || 0),
         owned: Boolean(item.Owned),
         notes: item.Notes || "Restored from local backup"
       })
@@ -294,10 +300,11 @@ async function restoreWatchlistBackup(items) {
 
 function livePL(item, quote) {
   const buy = Number(item.BuyPrice || 0);
+  const invested = Number(item.InvestedAmount || 0);
   const price = Number(quote.price || 0);
-  if (!item.Owned || !buy || !price) return { amount: 0, text: "-" };
-  const amount = price - buy;
-  const pct = (amount / buy) * 100;
+  if (!item.Owned || !buy || !price || !invested) return { amount: 0, text: "-" };
+  const pct = ((price - buy) / buy) * 100;
+  const amount = invested * (pct / 100);
   return { amount, text: `${amount >= 0 ? "▲" : "▼"} ${money(amount)} (${num(pct)}%)` };
 }
 
