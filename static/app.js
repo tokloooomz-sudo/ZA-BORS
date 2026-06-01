@@ -5,8 +5,10 @@ const sellAlertsEl = document.querySelector("#sellAlerts");
 const loadingBar = document.querySelector("#loadingBar");
 const searchForm = document.querySelector("#stockSearchForm");
 const searchResultsEl = document.querySelector("#stockSearchResults");
+const watchlistStatusEl = document.querySelector("#watchlistStatus");
 let authToken = sessionStorage.getItem("zaBorsToken");
 const WATCHLIST_BACKUP_KEY = "zaBorsWatchlistBackup";
+const WATCHLIST_REFRESH_MS = 10000;
 
 if (!authToken) {
   window.location.href = "/";
@@ -185,7 +187,10 @@ async function loadWatchlist(showLoading = false, restoreFromBackup = true) {
     watchedTickers = new Set(data.items.map(item => item.Ticker));
     saveWatchlistBackup(data.items);
     renderAlerts(data);
-    renderWatchlist(data.items);
+    if (!isEditingWatchlist()) {
+      renderWatchlist(data.items);
+    }
+    updateWatchlistStatus(data.items);
   } finally {
     if (showLoading) finishLoading();
   }
@@ -208,7 +213,7 @@ function renderWatchlist(items) {
   watchlistEl.innerHTML = `
     <table>
       <thead>
-        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
+        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>עודכן</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
       </thead>
       <tbody>
       ${items.map(item => {
@@ -222,6 +227,7 @@ function renderWatchlist(items) {
             <td>${item.Ticker}</td>
             <td class="${priceClass(q.change)}">${money(q.price)}</td>
             <td class="${priceClass(q.change)}">${q.change >= 0 ? "▲" : "▼"} ${money(q.change)} (${num(q.changePct)}%)</td>
+            <td><small>${q.updatedAt || ""}</small></td>
             <td><input id="buy-${item.Ticker}" class="buy-price-input" type="number" value="${item.BuyPrice || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
             <td><input id="invested-${item.Ticker}" class="buy-price-input" type="number" value="${item.InvestedAmount || 0}" min="0" step="0.01" inputmode="decimal" placeholder="1000" /></td>
             <td><button type="button" class="save-row-button" onclick="saveWatchRow('${item.Ticker}', '${notes}')">שמור</button></td>
@@ -233,6 +239,16 @@ function renderWatchlist(items) {
       </tbody>
     </table>
   `;
+}
+
+function isEditingWatchlist() {
+  return Boolean(document.activeElement && watchlistEl.contains(document.activeElement));
+}
+
+function updateWatchlistStatus(items) {
+  const now = new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const count = items ? items.length : 0;
+  watchlistStatusEl.textContent = `נשמרו ${count} מניות | רענון מחירים כל ${WATCHLIST_REFRESH_MS / 1000} שניות | עודכן ${now}`;
 }
 
 async function saveWatchRow(ticker, notes) {
@@ -387,7 +403,7 @@ function isWatched(ticker) { return watchedTickers.has(ticker); }
 function escapeAttr(value) { return String(value).replaceAll("'", "&#39;").replaceAll('"', "&quot;"); }
 
 loadWatchlist();
-setInterval(() => loadWatchlist(false), 60000);
+setInterval(() => loadWatchlist(false), WATCHLIST_REFRESH_MS);
 setInterval(keepServerAwake, 10 * 60 * 1000);
 setInterval(refreshAppQuietly, 30 * 60 * 1000);
 
