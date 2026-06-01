@@ -25,6 +25,7 @@ DATA_DIR = BASE_DIR / "data"
 WATCHLIST_PATH = DATA_DIR / "watchlist.json"
 BLINK_UNIVERSE_PATH = DATA_DIR / "blink_universe.csv"
 SESSION_MAX_AGE = 60 * 60 * 24 * 30
+ACTIONABLE_VERDICTS = {"כדאי מאוד", "כדאי לעקוב"}
 
 POSITIVE_NEWS_TERMS = {
     "approval": 18,
@@ -205,10 +206,26 @@ def universe(_: str = Depends(require_login)) -> dict[str, Any]:
 
 
 @app.get("/api/search")
-def search_stocks(q: str = "", _: str = Depends(require_login)) -> dict[str, Any]:
+def search_stocks(
+    q: str = "",
+    min_market_cap: float = 50_000_000,
+    min_price: float = 5,
+    max_price: float = 100,
+    _: str = Depends(require_login),
+) -> dict[str, Any]:
     query = q.strip().lower()
     if not query:
-        return {"results": []}
+        return {"results": [], "checked": 0, "rejected": 0}
+
+    if max_price < min_price:
+        min_price, max_price = max_price, min_price
+
+    scan_req = ScanRequest(
+        tickers=20,
+        min_market_cap=min_market_cap,
+        min_investment=min_price,
+        max_investment=max_price,
+    )
 
     df = pd.read_csv(BLINK_UNIVERSE_PATH).fillna("")
     mask = (
@@ -217,7 +234,7 @@ def search_stocks(q: str = "", _: str = Depends(require_login)) -> dict[str, Any
         | df["category"].astype(str).str.lower().str.contains(query, regex=False)
     )
     local_results = df.loc[mask].head(20).to_dict(orient="records")
-    results = [
+    candidates = [
         {
             "ticker": str(row.get("ticker", "")).upper(),
             "name": row.get("name", ""),
@@ -229,14 +246,30 @@ def search_stocks(q: str = "", _: str = Depends(require_login)) -> dict[str, Any
         for row in local_results
     ]
 
-    seen = {row["ticker"] for row in results}
+    seen = {row["ticker"] for row in candidates}
     for row in live_symbol_search(query):
         if row["ticker"] not in seen:
-            results.append(row)
+            candidates.append(row)
             seen.add(row["ticker"])
-        if len(results) >= 20:
+        if len(candidates) >= 20:
             break
-    return {"results": results}
+
+    results = []
+    rejected = 0
+    for candidate in candidates:
+        try:
+            scanned = scan_one(candidate["ticker"], scan_req)
+        except Exception:
+            rejected += 1
+            continue
+
+        if scanned["verdict"] in ACTIONABLE_VERDICTS:
+            results.append({**candidate, **scanned})
+        else:
+            rejected += 1
+
+    results.sort(key=lambda row: (verdict_order(row["verdict"]), -row["score"]))
+    return {"results": results, "checked": len(candidates), "rejected": rejected}
 
 
 @app.get("/api/watchlist")

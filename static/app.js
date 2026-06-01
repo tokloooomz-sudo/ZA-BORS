@@ -66,15 +66,26 @@ async function searchStocks(event) {
       return;
     }
 
-    const res = await apiFetch(`/api/search?q=${encodeURIComponent(query)}`);
+    const params = new URLSearchParams({
+      q: query,
+      min_market_cap: document.querySelector("#marketCap").value,
+      min_price: document.querySelector("#minInvestment").value || "5",
+      max_price: document.querySelector("#maxInvestment").value || "100"
+    });
+    const res = await apiFetch(`/api/search?${params.toString()}`);
     const data = await res.json();
-    renderSearchResults(data.results || []);
+    renderSearchResults(data.results || [], data);
   });
 }
 
-function renderSearchResults(results) {
+function renderSearchResults(results, meta = {}) {
   if (!results.length) {
-    searchResultsEl.innerHTML = `<p class="search-empty">לא נמצאה תוצאה ברשימה המקומית או בנתוני השוק החיים. בדוק שהסימול נכתב נכון.</p>`;
+    const checked = meta.checked || 0;
+    searchResultsEl.innerHTML = `
+      <p class="search-empty">
+        לא נמצאה מניה שעוברת את תנאי היועץ כרגע. נבדקו ${checked} תוצאות, ומה שלא מוצג סונן כי יצא "לא כדאי עכשיו", מחוץ לטווח המחיר, או בסיכון גבוה.
+      </p>
+    `;
     return;
   }
 
@@ -86,6 +97,7 @@ function renderSearchResults(results) {
             <strong>${item.ticker}</strong>
             <span>${item.name || ""}</span>
             <small>${item.category || ""}${item.quoteType ? ` | ${item.quoteType}` : ""}${item.exchange ? ` | ${item.exchange}` : ""}</small>
+            <small class="${verdictClass(item.verdict)}">${item.verdict} | ציון ${item.score} | ${item.scoreExplanation || item.reason || ""}</small>
           </div>
           <button type="button" onclick="addTicker('${item.ticker}', 0)" ${isWatched(item.ticker) ? "disabled" : ""}>+</button>
         </div>
