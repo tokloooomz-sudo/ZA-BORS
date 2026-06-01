@@ -26,10 +26,22 @@
         <label>מחיר מניה מקסימלי ($)<input id="maxInvestment" type="number" value="100" min="0" step="0.01" /></label>
         <button id="scanButton" class="primary">הפעל סריקה</button>
         <button id="refreshWatchlist">רענן רשימת מעקב</button>
-        <button id="logoutButton" type="button">יציאה</button>
+        <button id="logoutButton" class="logout-button" type="button">יציאה ונעילה</button>
       </aside>
 
       <section class="content">
+        <header>
+          <h2>חיפוש מניה</h2>
+          <span>חפש לפי שם חברה, סימול או תחום</span>
+        </header>
+        <section class="panel">
+          <form id="stockSearchForm" class="search-form">
+            <input id="stockSearchInput" placeholder="לדוגמה: Tesla, FUTU, software" />
+            <button type="submit">חפש</button>
+          </form>
+          <div id="stockSearchResults"></div>
+        </section>
+
         <header>
           <h2>אבחון מניות</h2>
           <span id="status">מוכן</span>

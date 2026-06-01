@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 WATCHLIST_PATH = DATA_DIR / "watchlist.json"
 BLINK_UNIVERSE_PATH = DATA_DIR / "blink_universe.csv"
-SESSION_MAX_AGE = 60 * 60 * 12
+SESSION_MAX_AGE = 60 * 60 * 24 * 30
 
 POSITIVE_NEWS_TERMS = {
     "approval": 18,
@@ -193,10 +193,31 @@ def logout() -> JSONResponse:
     return JSONResponse({"ok": True})
 
 
+@app.get("/api/ping")
+def ping(_: str = Depends(require_login)) -> dict[str, Any]:
+    return {"ok": True, "time": datetime.now(timezone.utc).isoformat()}
+
+
 @app.get("/api/universe")
 def universe(_: str = Depends(require_login)) -> dict[str, Any]:
     df = pd.read_csv(BLINK_UNIVERSE_PATH)
     return {"tickers": df.head(100).to_dict(orient="records")}
+
+
+@app.get("/api/search")
+def search_stocks(q: str = "", _: str = Depends(require_login)) -> dict[str, Any]:
+    query = q.strip().lower()
+    if not query:
+        return {"results": []}
+
+    df = pd.read_csv(BLINK_UNIVERSE_PATH).fillna("")
+    mask = (
+        df["ticker"].astype(str).str.lower().str.contains(query, regex=False)
+        | df["name"].astype(str).str.lower().str.contains(query, regex=False)
+        | df["category"].astype(str).str.lower().str.contains(query, regex=False)
+    )
+    results = df.loc[mask].head(20).to_dict(orient="records")
+    return {"results": results}
 
 
 @app.get("/api/watchlist")

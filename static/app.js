@@ -3,7 +3,9 @@ const signalsEl = document.querySelector("#signals");
 const watchlistEl = document.querySelector("#watchlist");
 const sellAlertsEl = document.querySelector("#sellAlerts");
 const loadingBar = document.querySelector("#loadingBar");
-const authToken = sessionStorage.getItem("zaBorsToken");
+const searchForm = document.querySelector("#stockSearchForm");
+const searchResultsEl = document.querySelector("#stockSearchResults");
+const authToken = localStorage.getItem("zaBorsToken");
 const WATCHLIST_BACKUP_KEY = "zaBorsWatchlistBackup";
 
 if (!authToken) {
@@ -14,6 +16,7 @@ if (!authToken) {
 document.querySelector("#scanButton").addEventListener("click", scan);
 document.querySelector("#refreshWatchlist").addEventListener("click", () => loadWatchlist(true));
 document.querySelector("#logoutButton").addEventListener("click", logout);
+searchForm.addEventListener("submit", searchStocks);
 document.querySelector("#watchForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   await withLoading(async () => {
@@ -50,6 +53,43 @@ async function scan() {
     renderSignals(data.rows);
     statusEl.textContent = `נמצאו ${data.rows.length} מתוך ${data.scanned || data.rows.length} מניות בטווח המחיר`;
   });
+}
+
+async function searchStocks(event) {
+  event.preventDefault();
+  await withLoading(async () => {
+    const query = document.querySelector("#stockSearchInput").value.trim();
+    if (!query) {
+      searchResultsEl.innerHTML = "";
+      return;
+    }
+
+    const res = await apiFetch(`/api/search?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    renderSearchResults(data.results || []);
+  });
+}
+
+function renderSearchResults(results) {
+  if (!results.length) {
+    searchResultsEl.innerHTML = `<p class="search-empty">לא נמצאו מניות בשם הזה ברשימת BLINK.</p>`;
+    return;
+  }
+
+  searchResultsEl.innerHTML = `
+    <div class="search-results-list">
+      ${results.map(item => `
+        <div class="search-result">
+          <div>
+            <strong>${item.ticker}</strong>
+            <span>${item.name || ""}</span>
+            <small>${item.category || ""}</small>
+          </div>
+          <button type="button" onclick="addTicker('${item.ticker}', 0)" ${isWatched(item.ticker) ? "disabled" : ""}>+</button>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 function renderSignals(rows) {
@@ -258,7 +298,7 @@ async function apiFetch(url, options) {
   };
   const response = await fetch(url, mergedOptions);
   if (response.status === 401) {
-    sessionStorage.removeItem("zaBorsToken");
+    localStorage.removeItem("zaBorsToken");
     window.location.href = "/";
     throw new Error("Login required");
   }
@@ -266,9 +306,22 @@ async function apiFetch(url, options) {
 }
 
 async function logout() {
-  sessionStorage.removeItem("zaBorsToken");
+  localStorage.removeItem("zaBorsToken");
   await fetch("/api/logout", { method: "POST" });
   window.location.href = "/";
+}
+
+async function keepServerAwake() {
+  try {
+    await apiFetch("/api/ping");
+  } catch {
+    // apiFetch redirects to login if needed.
+  }
+}
+
+async function refreshAppQuietly() {
+  await keepServerAwake();
+  await loadWatchlist(false);
 }
 
 function startLoading() {
@@ -303,4 +356,6 @@ function isWatched(ticker) { return watchedTickers.has(ticker); }
 function escapeAttr(value) { return String(value).replaceAll("'", "&#39;").replaceAll('"', "&quot;"); }
 
 loadWatchlist();
-setInterval(() => loadWatchlist(false), 15000);
+setInterval(() => loadWatchlist(false), 60000);
+setInterval(keepServerAwake, 10 * 60 * 1000);
+setInterval(refreshAppQuietly, 30 * 60 * 1000);
