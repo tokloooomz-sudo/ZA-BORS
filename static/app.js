@@ -5,7 +5,7 @@ const sellAlertsEl = document.querySelector("#sellAlerts");
 const loadingBar = document.querySelector("#loadingBar");
 const searchForm = document.querySelector("#stockSearchForm");
 const searchResultsEl = document.querySelector("#stockSearchResults");
-let authToken = localStorage.getItem("zaBorsToken") || sessionStorage.getItem("zaBorsToken");
+let authToken = sessionStorage.getItem("zaBorsToken");
 const WATCHLIST_BACKUP_KEY = "zaBorsWatchlistBackup";
 
 if (!authToken) {
@@ -13,7 +13,6 @@ if (!authToken) {
   throw new Error("Login required");
 }
 
-localStorage.setItem("zaBorsToken", authToken);
 sessionStorage.setItem("zaBorsToken", authToken);
 
 document.querySelector("#scanButton").addEventListener("click", scan);
