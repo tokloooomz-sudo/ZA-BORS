@@ -5,6 +5,7 @@ ZA-BORS is now a normal web app, not a Streamlit-only app.
 It scans a BLINK-focused US stock universe, shows advisor verdicts, lets you add stocks to a persistent watchlist, displays live-ish quotes, and tracks bought positions with sell alerts.
 
 > Research tool only. This is not financial advice.
+> The bundled BLINK list is a practical local universe, not an official complete BLINK export. The app also uses live Yahoo Finance search for tickers that are missing from the local list; always confirm final availability inside BLINK before trading.
 
 ## Run Locally
 

@@ -74,7 +74,7 @@ async function searchStocks(event) {
 
 function renderSearchResults(results) {
   if (!results.length) {
-    searchResultsEl.innerHTML = `<p class="search-empty">לא נמצאו מניות בשם הזה ברשימת BLINK.</p>`;
+    searchResultsEl.innerHTML = `<p class="search-empty">לא נמצאה תוצאה ברשימה המקומית או בנתוני השוק החיים. בדוק שהסימול נכתב נכון.</p>`;
     return;
   }
 
@@ -85,7 +85,7 @@ function renderSearchResults(results) {
           <div>
             <strong>${item.ticker}</strong>
             <span>${item.name || ""}</span>
-            <small>${item.category || ""}</small>
+            <small>${item.category || ""}${item.quoteType ? ` | ${item.quoteType}` : ""}${item.exchange ? ` | ${item.exchange}` : ""}</small>
           </div>
           <button type="button" onclick="addTicker('${item.ticker}', 0)" ${isWatched(item.ticker) ? "disabled" : ""}>+</button>
         </div>

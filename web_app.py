@@ -216,7 +216,26 @@ def search_stocks(q: str = "", _: str = Depends(require_login)) -> dict[str, Any
         | df["name"].astype(str).str.lower().str.contains(query, regex=False)
         | df["category"].astype(str).str.lower().str.contains(query, regex=False)
     )
-    results = df.loc[mask].head(20).to_dict(orient="records")
+    local_results = df.loc[mask].head(20).to_dict(orient="records")
+    results = [
+        {
+            "ticker": str(row.get("ticker", "")).upper(),
+            "name": row.get("name", ""),
+            "category": row.get("category", ""),
+            "source": "BLINK local list",
+            "quoteType": "EQUITY",
+            "exchange": "",
+        }
+        for row in local_results
+    ]
+
+    seen = {row["ticker"] for row in results}
+    for row in live_symbol_search(query):
+        if row["ticker"] not in seen:
+            results.append(row)
+            seen.add(row["ticker"])
+        if len(results) >= 20:
+            break
     return {"results": results}
 
 
@@ -408,6 +427,38 @@ def market_risk() -> dict[str, Any]:
     high = float(close.max())
     drop = ((high - current) / high) * 100 if high else 0
     return {"triggered": drop >= 10, "drop": drop}
+
+
+def live_symbol_search(query: str) -> list[dict[str, Any]]:
+    try:
+        search = yf.Search(query, max_results=12)
+        quotes = search.quotes or []
+    except Exception:
+        quotes = []
+
+    results = []
+    allowed_types = {"EQUITY", "ETF"}
+    allowed_exchanges = {"NMS", "NGM", "NCM", "NYQ", "ASE", "PCX", "NASDAQ", "NYSE", "AMEX"}
+    for quote in quotes:
+        symbol = str(quote.get("symbol") or "").upper().strip()
+        quote_type = str(quote.get("quoteType") or "").upper()
+        exchange = str(quote.get("exchange") or quote.get("exchDisp") or "").upper()
+        if not symbol or quote_type not in allowed_types:
+            continue
+        if exchange and not any(code in exchange for code in allowed_exchanges):
+            continue
+
+        results.append(
+            {
+                "ticker": symbol,
+                "name": quote.get("shortname") or quote.get("longname") or symbol,
+                "category": "נמצא בנתוני שוק חיים - בדוק זמינות ב-BLINK",
+                "source": "Yahoo Finance live search",
+                "quoteType": quote_type,
+                "exchange": quote.get("exchDisp") or exchange,
+            }
+        )
+    return results
 
 
 def compute_rsi(close: pd.Series, period: int = 14) -> float:
