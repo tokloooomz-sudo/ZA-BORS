@@ -57,6 +57,8 @@
             <input id="watchTicker" placeholder="Ticker, למשל FUTU" />
             <input id="watchBuyPrice" type="number" min="0" step="0.01" placeholder="מחיר קנייה" />
             <input id="watchInvestedAmount" type="number" min="0" step="0.01" placeholder="כמה כסף קניתי ($)" />
+            <input id="watchTargetBuyMin" type="number" min="0" step="0.01" placeholder="מחיר קנייה כדאי מינימום" />
+            <input id="watchTargetExitMax" type="number" min="0" step="0.01" placeholder="מחיר יציאה כדאי מקסימום" />
             <label class="inline"><input id="watchOwned" type="checkbox" /> קניתי בפועל</label>
             <input id="watchNotes" placeholder="הערה" />
             <button type="submit">הוסף</button>
@@ -66,6 +68,6 @@
         </section>
       </section>
     </main>
-    <script src="/static/app.js?v=20260601-session-login"></script>
+    <script src="/static/app.js?v=20260614-target-plan"></script>
   </body>
 </html>

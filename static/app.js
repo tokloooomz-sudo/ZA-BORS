@@ -8,7 +8,6 @@ const searchResultsEl = document.querySelector("#stockSearchResults");
 const watchlistStatusEl = document.querySelector("#watchlistStatus");
 let authToken = sessionStorage.getItem("zaBorsToken");
 const WATCHLIST_BACKUP_KEY = "zaBorsWatchlistBackup";
-const WATCHLIST_REFRESH_MS = 10000;
 
 if (!authToken) {
   window.location.href = "/";
@@ -31,6 +30,8 @@ document.querySelector("#watchForm").addEventListener("submit", async (event) =>
         ticker: document.querySelector("#watchTicker").value,
         buy_price: Number(document.querySelector("#watchBuyPrice").value || 0),
         invested_amount: Number(document.querySelector("#watchInvestedAmount").value || 0),
+        target_buy_min: Number(document.querySelector("#watchTargetBuyMin").value || 0),
+        target_exit_max: Number(document.querySelector("#watchTargetExitMax").value || 0),
         owned: document.querySelector("#watchOwned").checked,
         notes: document.querySelector("#watchNotes").value
       })
@@ -155,7 +156,7 @@ async function addTicker(ticker, price) {
     await apiFetch("/api/watchlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticker, buy_price: price, invested_amount: 0, owned: false, notes: "Added from scan" })
+      body: JSON.stringify({ ticker, buy_price: price, invested_amount: 0, target_buy_min: 0, target_exit_max: 0, owned: false, notes: "Added from scan" })
     });
     await loadWatchlist(false, true);
   });
@@ -213,12 +214,13 @@ function renderWatchlist(items) {
   watchlistEl.innerHTML = `
     <table>
       <thead>
-        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>עודכן</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
+        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>עודכן</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>קנייה כדאי מינימום</th><th>יציאה כדאי מקסימום</th><th>מצב יעד</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
       </thead>
       <tbody>
       ${items.map(item => {
         const q = item.quote;
         const pl = livePL(item, q);
+        const target = targetPlan(item, q);
         const notes = escapeAttr(item.Notes || "");
         return `
           <tr>
@@ -230,6 +232,9 @@ function renderWatchlist(items) {
             <td><small>${q.updatedAt || ""}</small></td>
             <td><input id="buy-${item.Ticker}" class="buy-price-input" type="number" value="${item.BuyPrice || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
             <td><input id="invested-${item.Ticker}" class="buy-price-input" type="number" value="${item.InvestedAmount || 0}" min="0" step="0.01" inputmode="decimal" placeholder="1000" /></td>
+            <td><input id="target-buy-${item.Ticker}" class="buy-price-input" type="number" value="${item.TargetBuyMin || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
+            <td><input id="target-exit-${item.Ticker}" class="buy-price-input" type="number" value="${item.TargetExitMax || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
+            <td class="${target.className}">${target.text}</td>
             <td><button type="button" class="save-row-button" onclick="saveWatchRow('${item.Ticker}', '${notes}')">שמור</button></td>
             <td class="${priceClass(pl.amount)}">${pl.text}</td>
             <td>${item.Notes || ""}</td>
@@ -248,23 +253,33 @@ function isEditingWatchlist() {
 function updateWatchlistStatus(items) {
   const now = new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const count = items ? items.length : 0;
-  watchlistStatusEl.textContent = `נשמרו ${count} מניות | רענון מחירים כל ${WATCHLIST_REFRESH_MS / 1000} שניות | עודכן ${now}`;
+  watchlistStatusEl.textContent = `נשמרו ${count} מניות | רענון ידני בלבד | עודכן ${now}`;
 }
 
 async function saveWatchRow(ticker, notes) {
   const owned = document.querySelector(`#owned-${ticker}`).checked;
   const buyPrice = document.querySelector(`#buy-${ticker}`).value;
   const investedAmount = document.querySelector(`#invested-${ticker}`).value;
-  await updateTicker(ticker, owned, buyPrice, investedAmount, notes);
-  statusEl.textContent = `מחיר הקנייה של ${ticker} נשמר`;
+  const targetBuyMin = document.querySelector(`#target-buy-${ticker}`).value;
+  const targetExitMax = document.querySelector(`#target-exit-${ticker}`).value;
+  await updateTicker(ticker, owned, buyPrice, investedAmount, targetBuyMin, targetExitMax, notes);
+  statusEl.textContent = `תוכנית הכניסה והיציאה של ${ticker} נשמרה`;
 }
 
-async function updateTicker(ticker, owned, buyPrice, investedAmount, notes) {
+async function updateTicker(ticker, owned, buyPrice, investedAmount, targetBuyMin, targetExitMax, notes) {
   await withLoading(async () => {
     await apiFetch(`/api/watchlist/${ticker}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticker, owned, buy_price: Number(buyPrice || 0), invested_amount: Number(investedAmount || 0), notes })
+      body: JSON.stringify({
+        ticker,
+        owned,
+        buy_price: Number(buyPrice || 0),
+        invested_amount: Number(investedAmount || 0),
+        target_buy_min: Number(targetBuyMin || 0),
+        target_exit_max: Number(targetExitMax || 0),
+        notes
+      })
     });
     await loadWatchlist(false, false);
   });
@@ -292,6 +307,8 @@ function saveWatchlistBackup(items) {
     Notes: item.Notes || "",
     BuyPrice: Number(item.BuyPrice || 0),
     InvestedAmount: Number(item.InvestedAmount || 0),
+    TargetBuyMin: Number(item.TargetBuyMin || 0),
+    TargetExitMax: Number(item.TargetExitMax || 0),
     Owned: Boolean(item.Owned)
   })).filter(item => item.Ticker);
 
@@ -307,6 +324,8 @@ async function restoreWatchlistBackup(items) {
         ticker: item.Ticker,
         buy_price: Number(item.BuyPrice || 0),
         invested_amount: Number(item.InvestedAmount || 0),
+        target_buy_min: Number(item.TargetBuyMin || 0),
+        target_exit_max: Number(item.TargetExitMax || 0),
         owned: Boolean(item.Owned),
         notes: item.Notes || "Restored from local backup"
       })
@@ -322,6 +341,18 @@ function livePL(item, quote) {
   const pct = ((price - buy) / buy) * 100;
   const amount = invested * (pct / 100);
   return { amount, text: `${amount >= 0 ? "▲" : "▼"} ${money(amount)} (${num(pct)}%)` };
+}
+
+function targetPlan(item, quote) {
+  const price = Number(quote.price || 0);
+  const buyTarget = Number(item.TargetBuyMin || 0);
+  const exitTarget = Number(item.TargetExitMax || 0);
+
+  if (!price) return { text: "-", className: "price-flat" };
+  if (exitTarget && price >= exitTarget) return { text: "▲ הגיע למחיר יציאה", className: "price-up" };
+  if (buyTarget && price <= buyTarget) return { text: "▼ הגיע למחיר קנייה", className: "price-down" };
+  if (buyTarget || exitTarget) return { text: "ממתין ליעד", className: "price-flat" };
+  return { text: "-", className: "price-flat" };
 }
 
 async function withLoading(task) {
@@ -358,19 +389,6 @@ async function logout() {
   window.location.href = "/";
 }
 
-async function keepServerAwake() {
-  try {
-    await apiFetch("/api/ping");
-  } catch {
-    // apiFetch redirects to login if needed.
-  }
-}
-
-async function refreshAppQuietly() {
-  await keepServerAwake();
-  await loadWatchlist(false);
-}
-
 function startLoading() {
   loadingBar.classList.remove("done");
   loadingBar.classList.add("active");
@@ -403,7 +421,4 @@ function isWatched(ticker) { return watchedTickers.has(ticker); }
 function escapeAttr(value) { return String(value).replaceAll("'", "&#39;").replaceAll('"', "&quot;"); }
 
 loadWatchlist();
-setInterval(() => loadWatchlist(false), WATCHLIST_REFRESH_MS);
-setInterval(keepServerAwake, 10 * 60 * 1000);
-setInterval(refreshAppQuietly, 30 * 60 * 1000);
 

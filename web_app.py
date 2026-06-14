@@ -87,6 +87,8 @@ class WatchItem(BaseModel):
     notes: str = ""
     buy_price: float = 0.0
     invested_amount: float = 0.0
+    target_buy_min: float = 0.0
+    target_exit_max: float = 0.0
     owned: bool = False
 
 
@@ -303,6 +305,8 @@ def add_watchlist(item: WatchItem, _: str = Depends(require_login)) -> dict[str,
             "Added": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "BuyPrice": float(item.buy_price or 0),
             "InvestedAmount": float(item.invested_amount or 0),
+            "TargetBuyMin": float(item.target_buy_min or 0),
+            "TargetExitMax": float(item.target_exit_max or 0),
             "Owned": bool(item.owned),
         }
     )
@@ -319,6 +323,8 @@ def update_watchlist(ticker: str, item: WatchItem, _: str = Depends(require_logi
             row["Notes"] = item.notes
             row["BuyPrice"] = float(item.buy_price or 0)
             row["InvestedAmount"] = float(item.invested_amount or 0)
+            row["TargetBuyMin"] = float(item.target_buy_min or 0)
+            row["TargetExitMax"] = float(item.target_exit_max or 0)
             row["Owned"] = bool(item.owned)
             save_watchlist(rows)
             return {"ok": True}
@@ -418,6 +424,8 @@ def load_watchlist() -> list[dict[str, Any]]:
                     "Added": str(row.get("Added", "")),
                     "BuyPrice": float(row.get("BuyPrice") or 0),
                     "InvestedAmount": float(row.get("InvestedAmount") or 0),
+                    "TargetBuyMin": float(row.get("TargetBuyMin") or 0),
+                    "TargetExitMax": float(row.get("TargetExitMax") or 0),
                     "Owned": bool(row.get("Owned", False)),
                 }
             )
