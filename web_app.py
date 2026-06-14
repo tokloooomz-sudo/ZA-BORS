@@ -279,14 +279,23 @@ def search_stocks(
 def get_watchlist(_: str = Depends(require_login)) -> dict[str, Any]:
     rows = load_watchlist()
     enriched = []
+    changed = False
     for row in rows:
         try:
             quote = fetch_quote(row["Ticker"])
+            if not row.get("TargetBuyMin") and quote.get("suggestedBuyMin"):
+                row["TargetBuyMin"] = float(quote["suggestedBuyMin"])
+                changed = True
+            if not row.get("TargetExitMax") and quote.get("suggestedExitMax"):
+                row["TargetExitMax"] = float(quote["suggestedExitMax"])
+                changed = True
             alerts = item_alerts(row, quote)
         except Exception as exc:
             quote = {"price": 0, "change": 0, "changePct": 0, "updatedAt": "N/A", "error": str(exc)}
             alerts = [f"{row['Ticker']}: לא הצלחתי להביא מחיר כרגע, אבל המניה נשארת ברשימת המעקב."]
         enriched.append({**row, "quote": quote, "alerts": alerts})
+    if changed:
+        save_watchlist(rows)
     return {"items": enriched, "market": market_risk()}
 
 
