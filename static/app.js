@@ -214,13 +214,15 @@ function renderWatchlist(items) {
   watchlistEl.innerHTML = `
     <table>
       <thead>
-        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>עודכן</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>קנייה כדאי מינימום</th><th>יציאה כדאי מקסימום</th><th>מצב יעד</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
+        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>עודכן</th><th>שפל 5 חודשים</th><th>שיא 5 חודשים</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>קנייה כדאי מינימום</th><th>יציאה כדאי מקסימום</th><th>מצב יעד</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
       </thead>
       <tbody>
       ${items.map(item => {
         const q = item.quote;
         const pl = livePL(item, q);
         const target = targetPlan(item, q);
+        const targetBuyValue = Number(item.TargetBuyMin || 0) || Number(q.suggestedBuyMin || 0);
+        const targetExitValue = Number(item.TargetExitMax || 0) || Number(q.suggestedExitMax || 0);
         const notes = escapeAttr(item.Notes || "");
         return `
           <tr>
@@ -230,10 +232,12 @@ function renderWatchlist(items) {
             <td class="${priceClass(q.change)}">${money(q.price)}</td>
             <td class="${priceClass(q.change)}">${q.change >= 0 ? "▲" : "▼"} ${money(q.change)} (${num(q.changePct)}%)</td>
             <td><small>${q.updatedAt || ""}</small></td>
+            <td>${money(q.low5m)}</td>
+            <td>${money(q.high5m)}</td>
             <td><input id="buy-${item.Ticker}" class="buy-price-input" type="number" value="${item.BuyPrice || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
             <td><input id="invested-${item.Ticker}" class="buy-price-input" type="number" value="${item.InvestedAmount || 0}" min="0" step="0.01" inputmode="decimal" placeholder="1000" /></td>
-            <td><input id="target-buy-${item.Ticker}" class="buy-price-input" type="number" value="${item.TargetBuyMin || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
-            <td><input id="target-exit-${item.Ticker}" class="buy-price-input" type="number" value="${item.TargetExitMax || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
+            <td><input id="target-buy-${item.Ticker}" class="buy-price-input" title="${q.planNote || ""}" type="number" value="${targetBuyValue || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
+            <td><input id="target-exit-${item.Ticker}" class="buy-price-input" title="${q.planNote || ""}" type="number" value="${targetExitValue || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
             <td class="${target.className}">${target.text}</td>
             <td><button type="button" class="save-row-button" onclick="saveWatchRow('${item.Ticker}', '${notes}')">שמור</button></td>
             <td class="${priceClass(pl.amount)}">${pl.text}</td>
@@ -345,8 +349,8 @@ function livePL(item, quote) {
 
 function targetPlan(item, quote) {
   const price = Number(quote.price || 0);
-  const buyTarget = Number(item.TargetBuyMin || 0);
-  const exitTarget = Number(item.TargetExitMax || 0);
+  const buyTarget = Number(item.TargetBuyMin || 0) || Number(quote.suggestedBuyMin || 0);
+  const exitTarget = Number(item.TargetExitMax || 0) || Number(quote.suggestedExitMax || 0);
 
   if (!price) return { text: "-", className: "price-flat" };
   if (exitTarget && price >= exitTarget) return { text: "▲ הגיע למחיר יציאה", className: "price-up" };

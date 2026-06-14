@@ -449,7 +449,65 @@ def fetch_quote(ticker: str) -> dict[str, Any]:
             price = float(hist["Close"].dropna().iloc[-1])
     change = price - prev if price and prev else 0
     pct = (change / prev) * 100 if prev else 0
-    return {"price": price, "change": change, "changePct": pct, "updatedAt": datetime.now(timezone.utc).strftime("%H:%M:%S UTC")}
+    plan = five_month_price_plan(stock, price)
+    return {
+        "price": price,
+        "change": change,
+        "changePct": pct,
+        "updatedAt": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
+        **plan,
+    }
+
+
+def five_month_price_plan(stock: yf.Ticker, current_price: float) -> dict[str, Any]:
+    try:
+        hist = stock.history(period="5mo", interval="1d", auto_adjust=False)
+    except Exception:
+        hist = pd.DataFrame()
+
+    if hist.empty or "Low" not in hist or "High" not in hist:
+        return {
+            "low5m": 0,
+            "high5m": 0,
+            "suggestedBuyMin": 0,
+            "suggestedExitMax": 0,
+            "planNote": "אין מספיק נתוני 5 חודשים.",
+        }
+
+    lows = hist["Low"].dropna()
+    highs = hist["High"].dropna()
+    closes = hist["Close"].dropna()
+    if lows.empty or highs.empty:
+        return {
+            "low5m": 0,
+            "high5m": 0,
+            "suggestedBuyMin": 0,
+            "suggestedExitMax": 0,
+            "planNote": "אין מספיק נתוני שפל/שיא.",
+        }
+
+    low_5m = float(lows.min())
+    high_5m = float(highs.max())
+    last_close = float(closes.iloc[-1]) if not closes.empty else current_price
+
+    # Conservative working levels: buy near the lower quarter, exit before the top.
+    price_range = max(0, high_5m - low_5m)
+    suggested_buy = low_5m + price_range * 0.18 if price_range else low_5m
+    suggested_exit = high_5m - price_range * 0.12 if price_range else high_5m
+
+    if current_price and suggested_buy > current_price:
+        suggested_buy = max(low_5m, current_price * 0.98)
+    if current_price and suggested_exit < current_price:
+        suggested_exit = max(current_price * 1.08, high_5m)
+
+    return {
+        "low5m": round(low_5m, 2),
+        "high5m": round(high_5m, 2),
+        "suggestedBuyMin": round(suggested_buy, 2),
+        "suggestedExitMax": round(suggested_exit, 2),
+        "planNote": f"שפל 5 חודשים ${low_5m:.2f}, שיא 5 חודשים ${high_5m:.2f}.",
+        "lastClose5m": round(last_close, 2),
+    }
 
 
 def item_alerts(row: dict[str, Any], quote: dict[str, Any]) -> list[str]:
