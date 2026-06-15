@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import time
 from hashlib import sha256
@@ -213,40 +214,50 @@ def search_stocks(
     q: str = "",
     _: str = Depends(require_login),
 ) -> dict[str, Any]:
-    query = q.strip().lower()
-    if not query:
+    raw_query = q.strip()
+    if not raw_query:
         return {"results": [], "checked": 0}
 
+    search_terms = stock_search_terms(raw_query)
+    normalized_terms = [term.lower() for term in search_terms]
+    preferred_symbols = preferred_search_symbols(raw_query) or {term.upper() for term in search_terms if looks_like_symbol(term)}
     df = pd.read_csv(BLINK_UNIVERSE_PATH).fillna("")
     ticker_values = df["ticker"].astype(str).str.lower()
-    mask = (
-        ticker_values.str.contains(query, regex=False)
-        | df["name"].astype(str).str.lower().str.contains(query, regex=False)
-        | df["category"].astype(str).str.lower().str.contains(query, regex=False)
-    )
-    exact_local = df.loc[ticker_values == query].to_dict(orient="records")
-    partial_local = df.loc[mask & (ticker_values != query)].head(19).to_dict(orient="records")
+    name_values = df["name"].astype(str).str.lower()
+    category_values = df["category"].astype(str).str.lower()
+    mask = pd.Series(False, index=df.index)
+    exact_mask = pd.Series(False, index=df.index)
+    for term in normalized_terms:
+        mask = mask | ticker_values.str.contains(term, regex=False) | name_values.str.contains(term, regex=False) | category_values.str.contains(term, regex=False)
+        if looks_like_symbol(term):
+            exact_mask = exact_mask | (ticker_values == term)
+
+    exact_local = df.loc[exact_mask].to_dict(orient="records")
+    partial_local = df.loc[mask & ~exact_mask].head(19).to_dict(orient="records")
     candidates = [
         {
             "ticker": str(row.get("ticker", "")).upper(),
             "name": row.get("name", ""),
             "category": row.get("category", ""),
             "source": "BLINK local list",
-            "quoteType": "EQUITY",
+            "quoteType": "ETF" if "etf" in f"{row.get('name', '')} {row.get('category', '')}".lower() else "EQUITY",
             "exchange": "",
         }
         for row in [*exact_local, *partial_local]
     ]
 
     seen = {row["ticker"] for row in candidates}
-    for row in live_symbol_search(query):
-        if row["ticker"] not in seen:
-            candidates.append(row)
-            seen.add(row["ticker"])
+    for term in search_terms:
+        for row in live_symbol_search(term):
+            if row["ticker"] not in seen:
+                candidates.append(row)
+                seen.add(row["ticker"])
+            if len(candidates) >= 20:
+                break
         if len(candidates) >= 20:
             break
 
-    candidates.sort(key=lambda row: (row["ticker"].lower() != query, row["ticker"]))
+    candidates.sort(key=lambda row: (row["ticker"] not in preferred_symbols, row["ticker"]))
     return {"results": candidates, "checked": len(candidates)}
 
 
@@ -548,6 +559,46 @@ def live_symbol_search(query: str) -> list[dict[str, Any]]:
             }
         )
     return results
+
+
+def stock_search_terms(raw_query: str) -> list[str]:
+    query = raw_query.strip()
+    if not query:
+        return []
+
+    terms = []
+    for match in re.findall(r"\(([A-Za-z][A-Za-z0-9.\-]{0,9})\)", query):
+        terms.append(match.upper())
+
+    if looks_like_symbol(query):
+        terms.append(query.upper())
+
+    ignored = {"ETF", "ETN", "INC", "LTD", "PLC", "CORP", "LONG", "SHORT", "DAILY", "STOCK"}
+    for token in re.findall(r"\b[A-Za-z][A-Za-z0-9.\-]{0,9}\b", query):
+        upper = token.upper()
+        if looks_like_symbol(upper) and upper not in ignored:
+            terms.append(upper)
+
+    terms.append(query)
+    unique_terms = []
+    seen = set()
+    for term in terms:
+        key = term.lower()
+        if key not in seen:
+            unique_terms.append(term)
+            seen.add(key)
+    return unique_terms[:8]
+
+
+def preferred_search_symbols(raw_query: str) -> set[str]:
+    symbols = {match.upper() for match in re.findall(r"\(([A-Za-z][A-Za-z0-9.\-]{0,9})\)", raw_query)}
+    if looks_like_symbol(raw_query):
+        symbols.add(raw_query.upper())
+    return symbols
+
+
+def looks_like_symbol(value: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9.\-]{0,9}", value.strip()))
 
 
 def compute_rsi(close: pd.Series, period: int = 14) -> float:
