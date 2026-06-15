@@ -70,12 +70,7 @@ async function searchStocks(event) {
       return;
     }
 
-    const params = new URLSearchParams({
-      q: query,
-      min_market_cap: document.querySelector("#marketCap").value,
-      min_price: document.querySelector("#minInvestment").value || "5",
-      max_price: document.querySelector("#maxInvestment").value || "100"
-    });
+    const params = new URLSearchParams({ q: query });
     const res = await apiFetch(`/api/search?${params.toString()}`);
     const data = await res.json();
     renderSearchResults(data.results || [], data);
@@ -87,7 +82,7 @@ function renderSearchResults(results, meta = {}) {
     const checked = meta.checked || 0;
     searchResultsEl.innerHTML = `
       <p class="search-empty">
-        לא נמצאה מניה שעוברת את תנאי היועץ כרגע. נבדקו ${checked} תוצאות, ומה שלא מוצג סונן כי יצא "לא כדאי עכשיו", מחוץ לטווח המחיר, או בסיכון גבוה.
+        לא נמצאה מניה לפי החיפוש הזה. נבדקו ${checked} תוצאות.
       </p>
     `;
     return;
@@ -101,7 +96,7 @@ function renderSearchResults(results, meta = {}) {
             <strong>${item.ticker}</strong>
             <span>${item.name || ""}</span>
             <small>${item.category || ""}${item.quoteType ? ` | ${item.quoteType}` : ""}${item.exchange ? ` | ${item.exchange}` : ""}</small>
-            <small class="${verdictClass(item.verdict)}">${item.verdict} | ציון ${item.score} | ${item.scoreExplanation || item.reason || ""}</small>
+            <small>הוסף לרשימת המעקב כדי להפעיל את בדיקות המחיר, הסיכון והתוכנית.</small>
           </div>
           <button type="button" onclick="addTicker('${item.ticker}', 0)" ${isWatched(item.ticker) ? "disabled" : ""}>+</button>
         </div>
@@ -156,7 +151,7 @@ async function addTicker(ticker, price) {
     await apiFetch("/api/watchlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticker, buy_price: price, invested_amount: 0, target_buy_min: 0, target_exit_max: 0, owned: false, notes: "Added from scan" })
+      body: JSON.stringify({ ticker, buy_price: price, invested_amount: 0, target_buy_min: 0, target_exit_max: 0, owned: false, notes: "Added from search" })
     });
     await loadWatchlist(false, true);
   });

@@ -211,32 +211,21 @@ def universe(_: str = Depends(require_login)) -> dict[str, Any]:
 @app.get("/api/search")
 def search_stocks(
     q: str = "",
-    min_market_cap: float = 50_000_000,
-    min_price: float = 5,
-    max_price: float = 100,
     _: str = Depends(require_login),
 ) -> dict[str, Any]:
     query = q.strip().lower()
     if not query:
-        return {"results": [], "checked": 0, "rejected": 0}
-
-    if max_price < min_price:
-        min_price, max_price = max_price, min_price
-
-    scan_req = ScanRequest(
-        tickers=20,
-        min_market_cap=min_market_cap,
-        min_investment=min_price,
-        max_investment=max_price,
-    )
+        return {"results": [], "checked": 0}
 
     df = pd.read_csv(BLINK_UNIVERSE_PATH).fillna("")
+    ticker_values = df["ticker"].astype(str).str.lower()
     mask = (
-        df["ticker"].astype(str).str.lower().str.contains(query, regex=False)
+        ticker_values.str.contains(query, regex=False)
         | df["name"].astype(str).str.lower().str.contains(query, regex=False)
         | df["category"].astype(str).str.lower().str.contains(query, regex=False)
     )
-    local_results = df.loc[mask].head(20).to_dict(orient="records")
+    exact_local = df.loc[ticker_values == query].to_dict(orient="records")
+    partial_local = df.loc[mask & (ticker_values != query)].head(19).to_dict(orient="records")
     candidates = [
         {
             "ticker": str(row.get("ticker", "")).upper(),
@@ -246,7 +235,7 @@ def search_stocks(
             "quoteType": "EQUITY",
             "exchange": "",
         }
-        for row in local_results
+        for row in [*exact_local, *partial_local]
     ]
 
     seen = {row["ticker"] for row in candidates}
@@ -257,22 +246,8 @@ def search_stocks(
         if len(candidates) >= 20:
             break
 
-    results = []
-    rejected = 0
-    for candidate in candidates:
-        try:
-            scanned = scan_one(candidate["ticker"], scan_req)
-        except Exception:
-            rejected += 1
-            continue
-
-        if scanned["verdict"] in ACTIONABLE_VERDICTS:
-            results.append({**candidate, **scanned})
-        else:
-            rejected += 1
-
-    results.sort(key=lambda row: (verdict_order(row["verdict"]), -row["score"]))
-    return {"results": results, "checked": len(candidates), "rejected": rejected}
+    candidates.sort(key=lambda row: (row["ticker"].lower() != query, row["ticker"]))
+    return {"results": candidates, "checked": len(candidates)}
 
 
 @app.get("/api/watchlist")
