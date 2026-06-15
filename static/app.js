@@ -91,12 +91,12 @@ function renderSearchResults(results, meta = {}) {
   searchResultsEl.innerHTML = `
     <div class="search-results-list">
       ${results.map(item => `
-        <div class="search-result">
+        <div class="search-result ${item.isLeveraged ? "leveraged-result" : ""}">
           <div>
             <strong>${item.ticker}</strong>
             <span>${item.name || ""}</span>
             <small>${item.category || ""}${item.quoteType ? ` | ${item.quoteType}` : ""}${item.exchange ? ` | ${item.exchange}` : ""}</small>
-            <small>הוסף לרשימת המעקב כדי להפעיל את בדיקות המחיר, הסיכון והתוכנית.</small>
+            <small>${item.isLeveraged ? "מוצר ממונף: רווח והפסד יכולים להיות מוכפלים. " : ""}הוסף לרשימת המעקב כדי להפעיל את בדיקות המחיר, הסיכון והתוכנית.</small>
           </div>
           <button type="button" onclick="addTicker('${item.ticker}', 0)" ${isWatched(item.ticker) ? "disabled" : ""}>+</button>
         </div>

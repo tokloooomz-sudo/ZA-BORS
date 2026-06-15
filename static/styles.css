@@ -191,16 +191,23 @@ td small {
 .watched {
   background: #ffe4ef;
 }
-.leveraged-row {
-  background: #fff1f1;
-  box-shadow: inset 4px 0 0 var(--red);
+.leveraged-row,
+.leveraged-row td,
+.leveraged-result {
+  background: #fff3d6;
+}
+.leveraged-row,
+.leveraged-result {
+  box-shadow: inset 4px 0 0 #f59e0b;
 }
 .leveraged-row td {
-  border-top-color: #f2b8b8;
-  border-bottom-color: #f2b8b8;
+  border-top-color: #f7c56b;
+  border-bottom-color: #f7c56b;
 }
-.leveraged-row strong {
-  color: var(--red);
+.leveraged-row strong,
+.leveraged-result small {
+  color: #9a4f00;
+  font-weight: 900;
 }
 .empty-state {
   padding: 26px;

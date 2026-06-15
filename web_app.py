@@ -242,6 +242,7 @@ def search_stocks(
             "source": "BLINK local list",
             "quoteType": "ETF" if "etf" in f"{row.get('name', '')} {row.get('category', '')}".lower() else "EQUITY",
             "exchange": "",
+            "isLeveraged": is_leveraged_product(row.get("ticker", ""), row.get("name", ""), row.get("category", "")),
         }
         for row in [*exact_local, *partial_local]
     ]
@@ -569,6 +570,11 @@ def live_symbol_search(query: str) -> list[dict[str, Any]]:
                 "source": "Yahoo Finance live search",
                 "quoteType": quote_type,
                 "exchange": quote.get("exchDisp") or exchange,
+                "isLeveraged": is_leveraged_product(
+                    symbol,
+                    quote.get("shortname") or quote.get("longname") or symbol,
+                    quote_type,
+                ),
             }
         )
     return results
