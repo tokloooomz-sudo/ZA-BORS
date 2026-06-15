@@ -339,16 +339,29 @@ def scan(req: ScanRequest, _: str = Depends(require_login)) -> JSONResponse:
     if req.max_investment < req.min_investment:
         req.min_investment, req.max_investment = req.max_investment, req.min_investment
 
-    universe_df = pd.read_csv(BLINK_UNIVERSE_PATH).head(min(max(req.tickers, 1), 100))
+    full_universe_df = pd.read_csv(BLINK_UNIVERSE_PATH).fillna("")
+    base_universe_df = full_universe_df.head(min(max(req.tickers, 1), 100))
+    leveraged_universe_df = full_universe_df[
+        full_universe_df.apply(
+            lambda row: is_leveraged_product(row.get("ticker", ""), row.get("name", ""), row.get("category", "")),
+            axis=1,
+        )
+    ]
+    universe_df = pd.concat([base_universe_df, leveraged_universe_df]).drop_duplicates(subset=["ticker"])
     rows = []
-    for ticker in universe_df["ticker"].tolist():
+    for item in universe_df.to_dict(orient="records"):
+        ticker = str(item.get("ticker", ""))
         try:
-            row = scan_one(str(ticker), req)
-            if row["priceInRange"] and row["verdict"] in ACTIONABLE_VERDICTS:
+            row = scan_one(ticker, req)
+            row["category"] = item.get("category", "")
+            row["isLeveraged"] = is_leveraged_product(row["ticker"], row["name"], row["category"])
+            if row["isLeveraged"]:
+                row["leverageWarning"] = "מוצר ממונף: רווח והפסד יכולים להיות מוכפלים, מתאים רק לסיכון גבוה."
+            if row["priceInRange"] and (row["verdict"] in ACTIONABLE_VERDICTS or row["isLeveraged"]):
                 rows.append(row)
         except Exception as exc:
             continue
-    rows.sort(key=lambda row: (verdict_order(row["verdict"]), -row["score"]))
+    rows.sort(key=lambda row: (not row.get("isLeveraged"), verdict_order(row["verdict"]), -row["score"]))
     return JSONResponse({"rows": rows, "scanned": len(universe_df)})
 
 
@@ -595,6 +608,13 @@ def preferred_search_symbols(raw_query: str) -> set[str]:
     if looks_like_symbol(raw_query):
         symbols.add(raw_query.upper())
     return symbols
+
+
+def is_leveraged_product(ticker: str, name: str, category: str = "") -> bool:
+    text = f"{ticker} {name} {category}".lower()
+    has_leverage_term = bool(re.search(r"\b[23]x\b|\b[23]x\s+(long|short)\b|leveraged|ultra|tradr", text))
+    is_etf_like = "etf" in text or "etn" in text or "fund" in text or "tradr" in text
+    return has_leverage_term and is_etf_like
 
 
 def looks_like_symbol(value: str) -> bool:

@@ -191,6 +191,17 @@ td small {
 .watched {
   background: #ffe4ef;
 }
+.leveraged-row {
+  background: #fff1f1;
+  box-shadow: inset 4px 0 0 var(--red);
+}
+.leveraged-row td {
+  border-top-color: #f2b8b8;
+  border-bottom-color: #f2b8b8;
+}
+.leveraged-row strong {
+  color: var(--red);
+}
 .empty-state {
   padding: 26px;
   text-align: center;

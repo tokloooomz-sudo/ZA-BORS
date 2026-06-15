@@ -126,7 +126,7 @@ function renderSignals(rows) {
       </thead>
       <tbody>
         ${rows.map(row => `
-          <tr data-ticker="${row.ticker}" class="${isWatched(row.ticker) ? "watched" : ""}">
+          <tr data-ticker="${row.ticker}" class="${row.isLeveraged ? "leveraged-row" : ""} ${isWatched(row.ticker) ? "watched" : ""}">
             <td><button onclick="addTicker('${row.ticker}', ${row.price})" ${isWatched(row.ticker) ? "disabled" : ""}>+</button></td>
             <td>${row.ticker}</td>
             <td class="${priceClass(row.change)}">${money(row.price)}</td>
@@ -138,7 +138,7 @@ function renderSignals(rows) {
             <td class="${riskClass(row.riskScore)}">${row.riskScore || 0}/100<br><small>${row.riskText || ""}</small></td>
             <td>${row.latestNews || ""}</td>
             <td><small>${row.scoreExplanation || ""}</small></td>
-            <td>${row.reason}</td>
+            <td>${row.isLeveraged ? `<strong>${row.leverageWarning || "מוצר ממונף בסיכון גבוה."}</strong><br>` : ""}${row.reason}</td>
           </tr>
         `).join("")}
       </tbody>
