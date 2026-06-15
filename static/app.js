@@ -57,7 +57,7 @@ async function scan() {
     });
     const data = await res.json();
     renderSignals(data.rows);
-    statusEl.textContent = `נמצאו ${data.rows.length} מניות שכדאי מאוד או כדאי לעקוב מתוך ${data.scanned || data.rows.length} שנסרקו`;
+    statusEl.textContent = `נמצאו ${data.rows.length} מניות שכדאי מאוד או כדאי לעקוב היום, כולל ממונפות אם עברו את הבדיקה, מתוך ${data.scanned || data.rows.length} שנסרקו`;
   });
 }
 
@@ -109,8 +109,8 @@ function renderSignals(rows) {
   if (!rows.length) {
     signalsEl.innerHTML = `
       <div class="empty-state">
-        <h3>לא נמצאו מניות שכדאי לפעול עליהן כרגע</h3>
-        <p>כל המניות שנסרקו יצאו "לא כדאי עכשיו", מחוץ לטווח המחיר, או בסיכון גבוה.</p>
+        <h3>לא נמצאו מניות שכדאי לפעול עליהן היום</h3>
+        <p>כל המניות שנסרקו, כולל ממונפות 2X Long, יצאו "לא כדאי עכשיו", מחוץ לטווח המחיר, או בסיכון גבוה.</p>
       </div>
     `;
     return;

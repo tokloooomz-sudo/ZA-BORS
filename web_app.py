@@ -358,11 +358,11 @@ def scan(req: ScanRequest, _: str = Depends(require_login)) -> JSONResponse:
             row["isLeveraged"] = is_leveraged_product(row["ticker"], row["name"], row["category"])
             if row["isLeveraged"]:
                 row["leverageWarning"] = "מוצר ממונף: רווח והפסד יכולים להיות מוכפלים, מתאים רק לסיכון גבוה."
-            if row["priceInRange"] and (row["verdict"] in ACTIONABLE_VERDICTS or row["isLeveraged"]):
+            if row["priceInRange"] and row["verdict"] in ACTIONABLE_VERDICTS:
                 rows.append(row)
         except Exception as exc:
             continue
-    rows.sort(key=lambda row: (not row.get("isLeveraged"), verdict_order(row["verdict"]), -row["score"]))
+    rows.sort(key=lambda row: (verdict_order(row["verdict"]), not row.get("isLeveraged"), -row["score"]))
     return JSONResponse({"rows": rows, "scanned": len(universe_df)})
 
 
