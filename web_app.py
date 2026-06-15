@@ -26,7 +26,7 @@ DATA_DIR = BASE_DIR / "data"
 WATCHLIST_PATH = DATA_DIR / "watchlist.json"
 BLINK_UNIVERSE_PATH = DATA_DIR / "blink_universe.csv"
 SESSION_MAX_AGE = 60 * 60 * 24 * 30
-ACTIONABLE_VERDICTS = {"כדאי מאוד", "כדאי לעקוב"}
+ACTIONABLE_VERDICTS = {"כדאי לקנות"}
 
 POSITIVE_NEWS_TERMS = {
     "approval": 18,
@@ -380,7 +380,7 @@ def scan(req: ScanRequest, _: str = Depends(require_login)) -> JSONResponse:
             row["isLeveraged"] = is_leveraged_product(row["ticker"], row["name"], row["category"])
             if row["isLeveraged"]:
                 row["leverageWarning"] = "מוצר ממונף: רווח והפסד יכולים להיות מוכפלים, מתאים רק לסיכון גבוה."
-            if row["priceInRange"] and row["verdict"] in ACTIONABLE_VERDICTS:
+            if row["priceInRange"] and is_buy_candidate(row):
                 rows.append(row)
         except Exception as exc:
             continue
@@ -413,7 +413,8 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
     technical_risk = crash_risk(close, price, high_52, change_pct, rsi)
     catalyst = news_signal["positive"] and not news_signal["negative"]
     score = score_stock(rsi, distance, market_cap, news_signal, technical_risk, price_in_range)
-    verdict = "כדאי מאוד" if score >= 80 else "כדאי לעקוב" if score >= 65 else "לא כדאי עכשיו"
+    buy_candidate = is_buy_setup(rsi, distance, news_signal, technical_risk, price_in_range, score)
+    verdict = "כדאי לקנות" if buy_candidate else "לא כדאי עכשיו"
     if not exchange_ok or not cap_ok or not price_in_range or technical_risk["avoid"]:
         verdict = "לא כדאי עכשיו"
     reason = reason_text(exchange_ok, cap_ok, price_in_range, news_signal, technical_risk, rsi, distance)
@@ -782,6 +783,24 @@ def score_stock(rsi: float, distance: float, market_cap: float, news_signal: dic
     return int(max(0, min(100, round(score))))
 
 
+def is_buy_setup(rsi: float, distance: float, news_signal: dict[str, Any], technical_risk: dict[str, Any], price_in_range: bool, score: int) -> bool:
+    if not price_in_range or technical_risk.get("avoid"):
+        return False
+    if distance < 12:
+        return False
+    if rsi > 48:
+        return False
+
+    rebound_signal = news_signal.get("positive") and not news_signal.get("negative")
+    deep_value_pullback = distance >= 25 and rsi <= 42 and int(technical_risk.get("score") or 0) < 50
+    solid_buy_score = score >= 72 and distance >= 15 and rsi <= 45
+    return bool(rebound_signal or deep_value_pullback or solid_buy_score)
+
+
+def is_buy_candidate(row: dict[str, Any]) -> bool:
+    return row.get("verdict") == "כדאי לקנות"
+
+
 def reason_text(exchange_ok: bool, cap_ok: bool, price_in_range: bool, news_signal: dict[str, Any], technical_risk: dict[str, Any], rsi: float, distance: float) -> str:
     if not exchange_ok:
         return "לא נסחרת בבורסה מתאימה."
@@ -795,11 +814,13 @@ def reason_text(exchange_ok: bool, cap_ok: bool, price_in_range: bool, news_sign
         return f"לא כדאי עכשיו: החדשות כוללות סיכון שלילי ({news_signal.get('summary')})."
     if not news_signal.get("positive"):
         return "לא נמצא קטליזטור חיובי ממשי לפי החדשות האחרונות."
-    if rsi > 45:
+    if distance < 12:
+        return "המחיר לא נמוך מספיק ביחס לשיא/טווח רגיל."
+    if rsi > 48:
         return "RSI גבוה יחסית, לא מספיק buy-low."
-    if distance < 10:
-        return "המחיר לא רחוק מספיק משיא 52 שבועות."
-    return f"הזדמנות אפשרית: ירידה במחיר יחד עם קטליזטור חדשות חיובי. {news_signal.get('summary')}"
+    if news_signal.get("positive"):
+        return f"כדאי לקנות: המחיר נמוך ביחס לשיא ויש סימן שיכול לתמוך בעלייה קרובה. {news_signal.get('summary')}"
+    return "כדאי לקנות בזהירות: המחיר נמוך משמעותית ביחס לשיא, בלי סיכון התרסקות גבוה, ועם פוטנציאל חזרה למעלה."
 
 
 def score_explanation(rsi: float, distance: float, news_signal: dict[str, Any], technical_risk: dict[str, Any], price_in_range: bool) -> str:
@@ -838,7 +859,7 @@ def score_explanation(rsi: float, distance: float, news_signal: dict[str, Any], 
 
 
 def verdict_order(verdict: str) -> int:
-    return {"כדאי מאוד": 0, "כדאי לעקוב": 1, "לא כדאי עכשיו": 2}.get(verdict, 3)
+    return {"כדאי לקנות": 0, "לא כדאי עכשיו": 2}.get(verdict, 3)
 
 
 def safe_info(stock: yf.Ticker) -> dict[str, Any]:

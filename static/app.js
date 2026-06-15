@@ -60,7 +60,7 @@ async function scan() {
     });
     const data = await res.json();
     renderSignals(data.rows);
-    statusEl.textContent = `נמצאו ${data.rows.length} מניות שכדאי מאוד או כדאי לעקוב היום, כולל ממונפות אם עברו את הבדיקה, מתוך ${data.scanned || data.rows.length} שנסרקו`;
+    statusEl.textContent = `נמצאו ${data.rows.length} מניות שכדאי לקנות היום, כולל ממונפות אם עברו את בדיקת הקנייה, מתוך ${data.scanned || data.rows.length} שנסרקו`;
   });
 }
 
@@ -112,8 +112,8 @@ function renderSignals(rows) {
   if (!rows.length) {
     signalsEl.innerHTML = `
       <div class="empty-state">
-        <h3>לא נמצאו מניות שכדאי לפעול עליהן היום</h3>
-        <p>כל המניות שנסרקו, כולל ממונפות 2X Long, יצאו "לא כדאי עכשיו", מחוץ לטווח המחיר, או בסיכון גבוה.</p>
+        <h3>לא נמצאו מניות שכדאי לקנות היום</h3>
+        <p>כל המניות שנסרקו, כולל ממונפות 2X Long, לא היו מספיק נמוכות ביחס לעצמן, לא הראו סיכוי ברור לעלייה קרובה, או היו בסיכון גבוה.</p>
       </div>
     `;
     return;
@@ -415,8 +415,7 @@ function finishLoading() {
 }
 
 function verdictClass(v) {
-  if (v === "כדאי מאוד") return "verdict-strong";
-  if (v === "כדאי לעקוב") return "verdict-watch";
+  if (v === "כדאי לקנות") return "verdict-strong";
   return "verdict-avoid";
 }
 function priceClass(change) {
