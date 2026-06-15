@@ -75,6 +75,24 @@ NEGATIVE_NEWS_TERMS = {
     "halted": 26,
 }
 
+LEVERAGED_SCAN_QUERIES = [
+    "Tradr 2X Long Daily ETF",
+    "2X Long Daily ETF",
+    "Leverage Shares 2x Long Daily ETF",
+    "GraniteShares 2x Long Daily ETF",
+]
+
+LEVERAGED_SCAN_SEEDS = [
+    {"ticker": "NEBX", "name": "Tradr 2X Long NBIS Daily ETF", "category": "2X Long / leveraged ETF"},
+    {"ticker": "NBIG", "name": "Leverage Shares 2x Long NBIS Daily ETF", "category": "2X Long / leveraged ETF"},
+    {"ticker": "NBIL", "name": "GraniteShares 2x Long NBIS Daily ETF", "category": "2X Long / leveraged ETF"},
+    {"ticker": "RGTU", "name": "Tradr 2X Long RGTI Daily ETF", "category": "2X Long / leveraged ETF"},
+    {"ticker": "TARK", "name": "Tradr 2X Long Innovation ETF", "category": "2X Long / leveraged ETF"},
+    {"ticker": "MQQQ", "name": "Tradr 2X Long Innovation 100 Monthly ETF", "category": "2X Long / leveraged ETF"},
+    {"ticker": "QQQP", "name": "Tradr 2X Long Innovation 100 Quarterly ETF", "category": "2X Long / leveraged ETF"},
+    {"ticker": "SPYQ", "name": "Tradr 2X Long SPY Quarterly ETF", "category": "2X Long / leveraged ETF"},
+]
+
 app = FastAPI(title="ZA-BORS")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Environment(
@@ -351,7 +369,8 @@ def scan(req: ScanRequest, _: str = Depends(require_login)) -> JSONResponse:
             axis=1,
         )
     ]
-    universe_df = pd.concat([base_universe_df, leveraged_universe_df]).drop_duplicates(subset=["ticker"])
+    live_leveraged_df = pd.DataFrame(live_leveraged_scan_candidates())
+    universe_df = pd.concat([base_universe_df, leveraged_universe_df, live_leveraged_df]).drop_duplicates(subset=["ticker"])
     rows = []
     for item in universe_df.to_dict(orient="records"):
         ticker = str(item.get("ticker", ""))
@@ -384,8 +403,11 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
     rsi = compute_rsi(close)
     market_cap = first_number(info.get("marketCap"))
     exchange = str(info.get("exchange") or info.get("fullExchangeName") or "")
-    exchange_ok = any(code in exchange.upper() for code in ["NMS", "NYQ", "NGM", "NCM", "NASDAQ", "NYSE"])
-    cap_ok = req.min_market_cap <= 0 or market_cap >= req.min_market_cap
+    name = info.get("shortName") or info.get("longName") or ticker
+    quote_type = str(info.get("quoteType") or "").upper()
+    leveraged_or_etf = quote_type == "ETF" or is_leveraged_product(ticker, name, quote_type)
+    exchange_ok = any(code in exchange.upper() for code in ["NMS", "NYQ", "NGM", "NCM", "NASDAQ", "NYSE", "ASE", "AMEX", "PCX", "BATS", "BTS", "CBOE"])
+    cap_ok = leveraged_or_etf or req.min_market_cap <= 0 or market_cap >= req.min_market_cap
     price_in_range = price > 0 and req.min_investment <= price <= req.max_investment
     news_signal = analyze_news(stock.news if hasattr(stock, "news") else [])
     technical_risk = crash_risk(close, price, high_52, change_pct, rsi)
@@ -397,7 +419,7 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
     reason = reason_text(exchange_ok, cap_ok, price_in_range, news_signal, technical_risk, rsi, distance)
     return {
         "ticker": ticker,
-        "name": info.get("shortName") or info.get("longName") or ticker,
+        "name": name,
         "price": price,
         "change": change,
         "changePct": change_pct,
@@ -581,6 +603,29 @@ def live_symbol_search(query: str) -> list[dict[str, Any]]:
             }
         )
     return results
+
+
+def live_leveraged_scan_candidates() -> list[dict[str, Any]]:
+    rows = list(LEVERAGED_SCAN_SEEDS)
+    seen = {row["ticker"] for row in rows}
+    for query in LEVERAGED_SCAN_QUERIES:
+        for row in live_symbol_search(query):
+            ticker = row["ticker"]
+            if ticker in seen:
+                continue
+            if not is_leveraged_product(ticker, row.get("name", ""), f"{row.get('category', '')} {row.get('quoteType', '')}"):
+                continue
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "name": row.get("name", ticker),
+                    "category": "2X Long / leveraged ETF from live Yahoo search",
+                }
+            )
+            seen.add(ticker)
+            if len(rows) >= 30:
+                return rows
+    return rows
 
 
 def stock_search_terms(raw_query: str) -> list[str]:
