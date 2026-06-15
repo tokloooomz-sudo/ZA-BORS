@@ -283,7 +283,10 @@ def get_watchlist(_: str = Depends(require_login)) -> dict[str, Any]:
         enriched.append({**row, "quote": quote, "alerts": alerts})
     if changed:
         save_watchlist(rows)
-    return {"items": enriched, "market": market_risk()}
+    return JSONResponse(
+        {"items": enriched, "market": market_risk()},
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @app.post("/api/watchlist")

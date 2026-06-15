@@ -8,6 +8,9 @@ const searchResultsEl = document.querySelector("#stockSearchResults");
 const watchlistStatusEl = document.querySelector("#watchlistStatus");
 let authToken = sessionStorage.getItem("zaBorsToken");
 const WATCHLIST_BACKUP_KEY = "zaBorsWatchlistBackup";
+const WATCHLIST_REFRESH_MS = 15000;
+let watchlistRefreshTimer = null;
+let watchlistRequestInFlight = false;
 
 if (!authToken) {
   window.location.href = "/";
@@ -167,6 +170,8 @@ async function addTicker(ticker, price) {
 let watchedTickers = new Set();
 
 async function loadWatchlist(showLoading = false, restoreFromBackup = true) {
+  if (watchlistRequestInFlight) return;
+  watchlistRequestInFlight = true;
   if (showLoading) startLoading();
   try {
     const res = await apiFetch("/api/watchlist");
@@ -188,8 +193,17 @@ async function loadWatchlist(showLoading = false, restoreFromBackup = true) {
     }
     updateWatchlistStatus(data.items);
   } finally {
+    watchlistRequestInFlight = false;
     if (showLoading) finishLoading();
   }
+}
+
+function startWatchlistAutoRefresh() {
+  if (watchlistRefreshTimer) return;
+  watchlistRefreshTimer = window.setInterval(() => {
+    if (document.hidden) return;
+    loadWatchlist(false, false);
+  }, WATCHLIST_REFRESH_MS);
 }
 
 function renderAlerts(data) {
@@ -252,7 +266,7 @@ function isEditingWatchlist() {
 function updateWatchlistStatus(items) {
   const now = new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const count = items ? items.length : 0;
-  watchlistStatusEl.textContent = `נשמרו ${count} מניות | רענון ידני בלבד | עודכן ${now}`;
+  watchlistStatusEl.textContent = `נשמרו ${count} מניות | רענון אוטומטי מ-Yahoo כל ${WATCHLIST_REFRESH_MS / 1000} שניות | עודכן ${now}`;
 }
 
 async function saveWatchRow(ticker, notes) {
@@ -366,6 +380,7 @@ async function withLoading(task) {
 async function apiFetch(url, options) {
   const mergedOptions = {
     ...(options || {}),
+    cache: "no-store",
     headers: {
       ...((options && options.headers) || {}),
       Authorization: `Bearer ${authToken}`
@@ -420,4 +435,5 @@ function isWatched(ticker) { return watchedTickers.has(ticker); }
 function escapeAttr(value) { return String(value).replaceAll("'", "&#39;").replaceAll('"', "&quot;"); }
 
 loadWatchlist();
+startWatchlistAutoRefresh();
 
