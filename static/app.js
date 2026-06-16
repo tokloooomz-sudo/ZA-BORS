@@ -185,8 +185,9 @@ async function loadWatchlist(showLoading = false, restoreFromBackup = true) {
       statusEl.textContent = "רשימת המעקב שוחזרה מהגיבוי המקומי";
     }
 
+    data.items = mergeWatchlistDisplayItems(data.items || [], backup);
     watchedTickers = new Set(data.items.map(item => item.Ticker));
-    saveWatchlistBackup(data.items, true);
+    saveWatchlistBackup(data.items, false);
     renderAlerts(data);
     if (!isEditingWatchlist()) {
       renderWatchlist(data.items);
@@ -202,7 +203,7 @@ function startWatchlistAutoRefresh() {
   if (watchlistRefreshTimer) return;
   watchlistRefreshTimer = window.setInterval(() => {
     if (document.hidden) return;
-    loadWatchlist(false, false);
+    loadWatchlist(false, true);
   }, WATCHLIST_REFRESH_MS);
 }
 
@@ -280,6 +281,15 @@ async function saveWatchRow(ticker, notes) {
 }
 
 async function updateTicker(ticker, owned, buyPrice, investedAmount, targetBuyMin, targetExitMax, notes) {
+  updateTickerInWatchlistBackup({
+    Ticker: ticker,
+    Notes: notes,
+    BuyPrice: Number(buyPrice || 0),
+    InvestedAmount: Number(investedAmount || 0),
+    TargetBuyMin: Number(targetBuyMin || 0),
+    TargetExitMax: Number(targetExitMax || 0),
+    Owned: Boolean(owned)
+  });
   await withLoading(async () => {
     await apiFetch(`/api/watchlist/${ticker}`, {
       method: "PATCH",
@@ -333,6 +343,15 @@ function normalizeWatchlistItems(items) {
   })).filter(item => item.Ticker);
 }
 
+function mergeWatchlistDisplayItems(serverItems, backupItems) {
+  const backupByTicker = new Map(normalizeWatchlistItems(backupItems).map(item => [item.Ticker, item]));
+  return (serverItems || []).map(item => {
+    const ticker = String(item.Ticker || "").toUpperCase();
+    const backup = backupByTicker.get(ticker);
+    return backup ? { ...item, ...backup, quote: item.quote, alerts: item.alerts } : item;
+  });
+}
+
 function saveWatchlistBackup(items, merge = false) {
   const clean = normalizeWatchlistItems(items);
   const rows = merge ? mergeWatchlistItems(readWatchlistBackup(), clean) : clean;
@@ -349,6 +368,13 @@ function mergeWatchlistItems(existingItems, newItems) {
 function removeTickerFromWatchlistBackup(ticker) {
   const target = String(ticker || "").toUpperCase();
   const rows = readWatchlistBackup().filter(item => item.Ticker !== target);
+  saveWatchlistBackup(rows, false);
+}
+
+function updateTickerInWatchlistBackup(item) {
+  const ticker = String(item.Ticker || "").toUpperCase();
+  if (!ticker) return;
+  const rows = mergeWatchlistItems(readWatchlistBackup(), [{ ...item, Ticker: ticker }]);
   saveWatchlistBackup(rows, false);
 }
 
