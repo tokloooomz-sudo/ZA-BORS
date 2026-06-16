@@ -24,6 +24,7 @@ from pydantic import BaseModel
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 WATCHLIST_PATH = DATA_DIR / "watchlist.json"
+WATCHLIST_SEED_PATH = DATA_DIR / "watchlist_seed.json"
 BLINK_UNIVERSE_PATH = DATA_DIR / "blink_universe.csv"
 SESSION_MAX_AGE = 60 * 60 * 24 * 30
 ACTIONABLE_VERDICTS = {"כדאי לקנות"}
@@ -444,11 +445,34 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
 
 def load_watchlist() -> list[dict[str, Any]]:
     if not WATCHLIST_PATH.exists():
-        return []
+        seed_rows = load_watchlist_seed()
+        if seed_rows:
+            save_watchlist(seed_rows)
+        return seed_rows
     try:
         data = json.loads(WATCHLIST_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
+    rows = normalize_watchlist_rows(data)
+    if not rows:
+        seed_rows = load_watchlist_seed()
+        if seed_rows:
+            save_watchlist(seed_rows)
+            return seed_rows
+    return rows
+
+
+def load_watchlist_seed() -> list[dict[str, Any]]:
+    if not WATCHLIST_SEED_PATH.exists():
+        return []
+    try:
+        data = json.loads(WATCHLIST_SEED_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return normalize_watchlist_rows(data)
+
+
+def normalize_watchlist_rows(data: Any) -> list[dict[str, Any]]:
     rows = []
     for row in data if isinstance(data, list) else []:
         if isinstance(row, dict) and row.get("Ticker"):

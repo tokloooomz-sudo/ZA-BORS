@@ -1,0 +1,122 @@
+[
+  {
+    "Ticker": "FUTU",
+    "Notes": "Restored from saved watchlist",
+    "Added": "2026-05-26",
+    "BuyPrice": 104.2014,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 95.59,
+    "TargetExitMax": 173.59,
+    "Owned": true
+  },
+  {
+    "Ticker": "HOOD",
+    "Notes": "Restored from saved watchlist",
+    "Added": "2026-05-26",
+    "BuyPrice": 74.32,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 73.84,
+    "TargetExitMax": 114,
+    "Owned": true
+  },
+  {
+    "Ticker": "CRM",
+    "Notes": "Restored from saved watchlist",
+    "Added": "2026-05-26",
+    "BuyPrice": 180.07,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 162.57,
+    "TargetExitMax": 248.97,
+    "Owned": false
+  },
+  {
+    "Ticker": "SHOP",
+    "Notes": "Restored from saved watchlist",
+    "Added": "2026-05-26",
+    "BuyPrice": 103.96901,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 107.84,
+    "TargetExitMax": 161.67,
+    "Owned": true
+  },
+  {
+    "Ticker": "PLTR",
+    "Notes": "Restored from saved watchlist",
+    "Added": "2026-05-26",
+    "BuyPrice": 136.88,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 125.43,
+    "TargetExitMax": 175.26,
+    "Owned": true
+  },
+  {
+    "Ticker": "RGTI",
+    "Notes": "Restored from recent watchlist",
+    "Added": "2026-06-16",
+    "BuyPrice": 0,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 15.33,
+    "TargetExitMax": 26.2,
+    "Owned": false
+  },
+  {
+    "Ticker": "P",
+    "Notes": "Restored from recent watchlist",
+    "Added": "2026-06-16",
+    "BuyPrice": 0,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 63.47,
+    "TargetExitMax": 89.46,
+    "Owned": true
+  },
+  {
+    "Ticker": "SOUN",
+    "Notes": "Restored from recent watchlist",
+    "Added": "2026-06-16",
+    "BuyPrice": 0,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 6.87,
+    "TargetExitMax": 10.91,
+    "Owned": false
+  },
+  {
+    "Ticker": "SWMR",
+    "Notes": "Restored from recent watchlist",
+    "Added": "2026-06-16",
+    "BuyPrice": 0,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 24.22,
+    "TargetExitMax": 74.65,
+    "Owned": false
+  },
+  {
+    "Ticker": "NEBX",
+    "Notes": "Restored from recent watchlist",
+    "Added": "2026-06-16",
+    "BuyPrice": 0,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 17.03,
+    "TargetExitMax": 57.51,
+    "Owned": false
+  },
+  {
+    "Ticker": "FUTG",
+    "Notes": "Restored from recent watchlist",
+    "Added": "2026-06-16",
+    "BuyPrice": 0,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 3.49,
+    "TargetExitMax": 15.95,
+    "Owned": false
+  },
+  {
+    "Ticker": "HOOX",
+    "Notes": "Restored from recent watchlist",
+    "Added": "2026-06-16",
+    "BuyPrice": 0,
+    "InvestedAmount": 0,
+    "TargetBuyMin": 24.02,
+    "TargetExitMax": 53.51,
+    "Owned": false
+  }
+]
