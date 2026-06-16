@@ -178,7 +178,7 @@ async function loadWatchlist(showLoading = false, restoreFromBackup = true) {
     let data = await res.json();
     const backup = readWatchlistBackup();
 
-    if (restoreFromBackup && (!data.items || data.items.length === 0) && backup.length > 0) {
+    if (restoreFromBackup && shouldRestoreWatchlistBackup(data.items || [], backup)) {
       await restoreWatchlistBackup(backup);
       const restoredRes = await apiFetch("/api/watchlist");
       data = await restoredRes.json();
@@ -186,7 +186,7 @@ async function loadWatchlist(showLoading = false, restoreFromBackup = true) {
     }
 
     watchedTickers = new Set(data.items.map(item => item.Ticker));
-    saveWatchlistBackup(data.items);
+    saveWatchlistBackup(data.items, true);
     renderAlerts(data);
     if (!isEditingWatchlist()) {
       renderWatchlist(data.items);
@@ -300,6 +300,7 @@ async function updateTicker(ticker, owned, buyPrice, investedAmount, targetBuyMi
 
 async function removeTicker(ticker) {
   await withLoading(async () => {
+    removeTickerFromWatchlistBackup(ticker);
     await apiFetch(`/api/watchlist/${ticker}`, { method: "DELETE" });
     await loadWatchlist(false, false);
   });
@@ -314,8 +315,14 @@ function readWatchlistBackup() {
   }
 }
 
-function saveWatchlistBackup(items) {
-  const clean = (items || []).map(item => ({
+function shouldRestoreWatchlistBackup(serverItems, backupItems) {
+  const serverTickers = new Set((serverItems || []).map(item => String(item.Ticker || "").toUpperCase()).filter(Boolean));
+  const missingBackupItems = (backupItems || []).filter(item => item.Ticker && !serverTickers.has(String(item.Ticker).toUpperCase()));
+  return backupItems.length > serverItems.length && missingBackupItems.length > 0;
+}
+
+function normalizeWatchlistItems(items) {
+  return (items || []).map(item => ({
     Ticker: String(item.Ticker || "").toUpperCase(),
     Notes: item.Notes || "",
     BuyPrice: Number(item.BuyPrice || 0),
@@ -324,8 +331,25 @@ function saveWatchlistBackup(items) {
     TargetExitMax: Number(item.TargetExitMax || 0),
     Owned: Boolean(item.Owned)
   })).filter(item => item.Ticker);
+}
 
-  localStorage.setItem(WATCHLIST_BACKUP_KEY, JSON.stringify(clean));
+function saveWatchlistBackup(items, merge = false) {
+  const clean = normalizeWatchlistItems(items);
+  const rows = merge ? mergeWatchlistItems(readWatchlistBackup(), clean) : clean;
+  localStorage.setItem(WATCHLIST_BACKUP_KEY, JSON.stringify(rows));
+}
+
+function mergeWatchlistItems(existingItems, newItems) {
+  const merged = new Map();
+  for (const item of normalizeWatchlistItems(existingItems)) merged.set(item.Ticker, item);
+  for (const item of normalizeWatchlistItems(newItems)) merged.set(item.Ticker, { ...(merged.get(item.Ticker) || {}), ...item });
+  return Array.from(merged.values());
+}
+
+function removeTickerFromWatchlistBackup(ticker) {
+  const target = String(ticker || "").toUpperCase();
+  const rows = readWatchlistBackup().filter(item => item.Ticker !== target);
+  saveWatchlistBackup(rows, false);
 }
 
 async function restoreWatchlistBackup(items) {
