@@ -123,7 +123,7 @@ function renderSignals(rows) {
     <table>
       <thead>
         <tr>
-          <th>+</th><th>סימול</th><th>מחיר</th><th>החלטת יועץ</th><th>ציון</th>
+          <th>+</th><th>סימול</th><th>מחיר</th><th>שפל 5 חודשים</th><th>שיא 5 חודשים</th><th>החלטת יועץ</th><th>ציון</th>
           <th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיכון התרסקות</th><th>חדשה אחרונה</th><th>הסבר ציון</th><th>סיבה</th>
         </tr>
       </thead>
@@ -133,6 +133,8 @@ function renderSignals(rows) {
             <td><button onclick="addTicker('${row.ticker}', ${row.price})" ${isWatched(row.ticker) ? "disabled" : ""}>+</button></td>
             <td>${row.ticker}</td>
             <td class="${priceClass(row.change)}">${money(row.price)}</td>
+            <td>${money(row.low5m)}</td>
+            <td>${money(row.high5m)}</td>
             <td class="${verdictClass(row.verdict)}">${row.verdict}</td>
             <td>${row.score}</td>
             <td>${num(row.rsi)}</td>

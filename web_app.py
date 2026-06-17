@@ -400,6 +400,7 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
     change = price - previous_close if price and previous_close else 0
     change_pct = (change / previous_close) * 100 if previous_close else 0
     high_52 = first_number(info.get("fiftyTwoWeekHigh"), fast.get("year_high"), close.max() if len(close) else 0)
+    low_5m, high_5m = five_month_history_range(hist)
     distance = ((high_52 - price) / high_52) * 100 if high_52 else 0
     rsi = compute_rsi(close)
     market_cap = first_number(info.get("marketCap"))
@@ -425,6 +426,8 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
         "price": price,
         "change": change,
         "changePct": change_pct,
+        "low5m": low_5m,
+        "high5m": high_5m,
         "exchange": exchange or "N/A",
         "marketCap": market_cap,
         "rsi": rsi,
@@ -567,6 +570,23 @@ def five_month_price_plan(stock: yf.Ticker, current_price: float) -> dict[str, A
         "planNote": f"שפל 5 חודשים ${low_5m:.2f}, שיא 5 חודשים ${high_5m:.2f}.",
         "lastClose5m": round(last_close, 2),
     }
+
+
+def five_month_history_range(hist: pd.DataFrame) -> tuple[float, float]:
+    if hist.empty or "Low" not in hist or "High" not in hist:
+        return 0.0, 0.0
+
+    try:
+        latest_date = hist.index.max()
+        recent = hist.loc[hist.index >= latest_date - pd.DateOffset(months=5)]
+    except Exception:
+        recent = hist.tail(110)
+
+    lows = recent["Low"].dropna()
+    highs = recent["High"].dropna()
+    if lows.empty or highs.empty:
+        return 0.0, 0.0
+    return round(float(lows.min()), 2), round(float(highs.max()), 2)
 
 
 def item_alerts(row: dict[str, Any], quote: dict[str, Any]) -> list[str]:
