@@ -123,7 +123,7 @@ function renderSignals(rows) {
     <table>
       <thead>
         <tr>
-          <th>+</th><th>סימול</th><th>מחיר</th><th>שפל 5 חודשים</th><th>שיא 5 חודשים</th><th>החלטת יועץ</th><th>ציון</th>
+          <th>+</th><th>סימול</th><th>מחיר</th><th>שפל 5 חודשים</th><th>ממוצע 5 חודשים</th><th>שיא 5 חודשים</th><th>החלטת יועץ</th><th>ציון</th>
           <th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיכון התרסקות</th><th>חדשה אחרונה</th><th>הסבר ציון</th><th>סיבה</th>
         </tr>
       </thead>
@@ -134,6 +134,7 @@ function renderSignals(rows) {
             <td>${row.ticker}</td>
             <td class="${priceClass(row.change)}">${money(row.price)}</td>
             <td>${money(row.low5m)}</td>
+            <td>${money(row.avg5m)}</td>
             <td>${money(row.high5m)}</td>
             <td class="${verdictClass(row.verdict)}">${row.verdict}</td>
             <td>${row.score}</td>
@@ -226,7 +227,7 @@ function renderWatchlist(items) {
   watchlistEl.innerHTML = `
     <table>
       <thead>
-        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>עודכן</th><th>שפל 5 חודשים</th><th>שיא 5 חודשים</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>קנייה כדאי מינימום</th><th>יציאה כדאי מקסימום</th><th>מצב יעד</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
+        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>עודכן</th><th>שפל 5 חודשים</th><th>ממוצע 5 חודשים</th><th>שיא 5 חודשים</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>קנייה כדאי מינימום</th><th>יציאה כדאי מקסימום</th><th>מצב יעד</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
       </thead>
       <tbody>
       ${items.map(item => {
@@ -245,6 +246,7 @@ function renderWatchlist(items) {
             <td class="${priceClass(q.change)}">${q.change >= 0 ? "▲" : "▼"} ${money(q.change)} (${num(q.changePct)}%)</td>
             <td><small>${q.updatedAt || ""}</small></td>
             <td>${money(q.low5m)}</td>
+            <td>${money(q.avg5m)}</td>
             <td>${money(q.high5m)}</td>
             <td><input id="buy-${item.Ticker}" class="buy-price-input" type="number" value="${item.BuyPrice || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
             <td><input id="invested-${item.Ticker}" class="buy-price-input" type="number" value="${item.InvestedAmount || 0}" min="0" step="0.01" inputmode="decimal" placeholder="1000" /></td>
