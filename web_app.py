@@ -300,7 +300,7 @@ def get_watchlist(_: str = Depends(require_login)) -> dict[str, Any]:
             quote = {"price": 0, "change": 0, "changePct": 0, "updatedAt": "N/A", "error": str(exc)}
             alerts = [f"{row['Ticker']}: לא הצלחתי להביא מחיר כרגע, אבל המניה נשארת ברשימת המעקב."]
         enriched.append({**row, "quote": quote, "alerts": alerts})
-    if changed:
+    if changed or rows:
         save_watchlist(rows)
     return JSONResponse(
         {"items": enriched, "market": market_risk()},
@@ -317,16 +317,18 @@ def add_watchlist(item: WatchItem, _: str = Depends(require_login)) -> dict[str,
     if any(row["Ticker"] == ticker for row in rows):
         return {"ok": False, "message": f"{ticker} already exists"}
     rows.append(
-        {
-            "Ticker": ticker,
-            "Notes": item.notes,
-            "Added": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-            "BuyPrice": float(item.buy_price or 0),
-            "InvestedAmount": float(item.invested_amount or 0),
-            "TargetBuyMin": float(item.target_buy_min or 0),
-            "TargetExitMax": float(item.target_exit_max or 0),
-            "Owned": bool(item.owned),
-        }
+        normalize_watchlist_row(
+            {
+                "Ticker": ticker,
+                "Notes": item.notes,
+                "Added": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "BuyPrice": float(item.buy_price or 0),
+                "InvestedAmount": float(item.invested_amount or 0),
+                "TargetBuyMin": float(item.target_buy_min or 0),
+                "TargetExitMax": float(item.target_exit_max or 0),
+                "Owned": bool(item.owned),
+            }
+        )
     )
     save_watchlist(rows)
     return {"ok": True}
@@ -344,6 +346,7 @@ def update_watchlist(ticker: str, item: WatchItem, _: str = Depends(require_logi
             row["TargetBuyMin"] = float(item.target_buy_min or 0)
             row["TargetExitMax"] = float(item.target_exit_max or 0)
             row["Owned"] = bool(item.owned)
+            row.update(normalize_watchlist_row(row))
             save_watchlist(rows)
             return {"ok": True}
     return {"ok": False, "message": "Ticker not found"}
@@ -480,19 +483,28 @@ def normalize_watchlist_rows(data: Any) -> list[dict[str, Any]]:
     rows = []
     for row in data if isinstance(data, list) else []:
         if isinstance(row, dict) and row.get("Ticker"):
-            rows.append(
-                {
-                    "Ticker": str(row.get("Ticker", "")).upper().strip(),
-                    "Notes": str(row.get("Notes", "")),
-                    "Added": str(row.get("Added", "")),
-                    "BuyPrice": float(row.get("BuyPrice") or 0),
-                    "InvestedAmount": float(row.get("InvestedAmount") or 0),
-                    "TargetBuyMin": float(row.get("TargetBuyMin") or 0),
-                    "TargetExitMax": float(row.get("TargetExitMax") or 0),
-                    "Owned": bool(row.get("Owned", False)),
-                }
-            )
+            rows.append(normalize_watchlist_row(row))
     return rows
+
+
+def normalize_watchlist_row(row: dict[str, Any]) -> dict[str, Any]:
+    buy_price = float(row.get("BuyPrice") or 0)
+    invested_amount = float(row.get("InvestedAmount") or 0)
+    owned = bool(row.get("Owned", False)) and buy_price > 0 and invested_amount > 0
+    if not owned:
+        buy_price = 0.0
+        invested_amount = 0.0
+
+    return {
+        "Ticker": str(row.get("Ticker", "")).upper().strip(),
+        "Notes": str(row.get("Notes", "")),
+        "Added": str(row.get("Added", "")),
+        "BuyPrice": buy_price,
+        "InvestedAmount": invested_amount,
+        "TargetBuyMin": float(row.get("TargetBuyMin") or 0),
+        "TargetExitMax": float(row.get("TargetExitMax") or 0),
+        "Owned": owned,
+    }
 
 
 def save_watchlist(rows: list[dict[str, Any]]) -> None:
