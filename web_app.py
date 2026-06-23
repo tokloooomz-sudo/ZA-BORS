@@ -922,7 +922,12 @@ def rebound_profile(close: pd.Series, price: float, high_3m: float, change_pct: 
         reasons.append("ירידה יומית חדה מדי")
 
     score = int(max(0, min(100, score)))
-    confirmed = high_drop >= 15 and score >= 55 and gain_5d > 0 and change_pct > -4
+    confirmed = (
+        high_drop >= 12
+        and score >= 45
+        and change_pct > -5
+        and (gain_5d > 0 or gain_10d > 1.5 or bounce_from_low >= 3 or latest >= ma5)
+    )
     summary = " | ".join(reasons[:4]) if reasons else "לא זוהו סימני התאוששות."
     return {"confirmed": confirmed, "score": score, "summary": summary}
 
@@ -981,14 +986,15 @@ def is_buy_setup(
         return False
     if not rebound_signal.get("confirmed"):
         return False
-    if rsi > 48:
+    if rsi > 58:
         return False
 
     positive_news = news_signal.get("positive") and not news_signal.get("negative")
     deep_value_pullback = distance >= 25 and rsi <= 42 and int(technical_risk.get("score") or 0) < 50
     recovery_score = int(rebound_signal.get("score") or 0)
-    solid_buy_score = score >= 72 and distance >= 15 and rsi <= 45 and recovery_score >= 55
-    return bool((positive_news and recovery_score >= 55) or deep_value_pullback or solid_buy_score)
+    technical_rebound = recovery_score >= 50 and score >= 55 and distance >= 12
+    solid_buy_score = score >= 65 and distance >= 15 and rsi <= 55 and recovery_score >= 50
+    return bool((positive_news and recovery_score >= 45) or deep_value_pullback or technical_rebound or solid_buy_score)
 
 
 def is_buy_candidate(row: dict[str, Any]) -> bool:
@@ -1022,11 +1028,9 @@ def reason_text(
         return f"לא כדאי עכשיו: המניה לא קרובה מספיק לשפל 3 חודשים ({near_low_5m:.1f}% מעל השפל) ולא לפחות 15% מתחת לשיא 3 חודשים ({below_high_5m:.1f}%)."
     if not rebound_signal.get("confirmed"):
         return f"לא כדאי עכשיו: המניה ירדה, אבל עדיין אין מספיק סימני התאוששות לכניסה ({rebound_signal.get('summary')})."
-    if not news_signal.get("positive"):
-        return "לא נמצא קטליזטור חיובי ממשי לפי החדשות האחרונות."
     if distance < 12 and not five_month_opportunity:
         return "המחיר לא נמוך מספיק ביחס לשיא/טווח רגיל."
-    if rsi > 48:
+    if rsi > 58:
         return "RSI גבוה יחסית, לא מספיק buy-low."
     if news_signal.get("positive"):
         return f"כדאי לקנות: המחיר נמוך ביחס לשיא ויש סימן שיכול לתמוך בעלייה קרובה. {news_signal.get('summary')}"
