@@ -551,7 +551,7 @@ def fetch_quote(ticker: str) -> dict[str, Any]:
 
 def five_month_price_plan(stock: yf.Ticker, current_price: float) -> dict[str, Any]:
     try:
-        hist = stock.history(period="5mo", interval="1d", auto_adjust=False)
+        hist = stock.history(period="3mo", interval="1d", auto_adjust=False)
     except Exception:
         hist = pd.DataFrame()
 
@@ -562,7 +562,7 @@ def five_month_price_plan(stock: yf.Ticker, current_price: float) -> dict[str, A
             "avg5m": 0,
             "suggestedBuyMin": 0,
             "suggestedExitMax": 0,
-            "planNote": "אין מספיק נתוני 5 חודשים.",
+            "planNote": "אין מספיק נתוני 3 חודשים.",
         }
 
     lows = hist["Low"].dropna()
@@ -599,7 +599,7 @@ def five_month_price_plan(stock: yf.Ticker, current_price: float) -> dict[str, A
         "avg5m": round(avg_5m, 2),
         "suggestedBuyMin": round(suggested_buy, 2),
         "suggestedExitMax": round(suggested_exit, 2),
-        "planNote": f"שפל 5 חודשים ${low_5m:.2f}, ממוצע 5 חודשים ${avg_5m:.2f}, שיא 5 חודשים ${high_5m:.2f}.",
+        "planNote": f"שפל 3 חודשים ${low_5m:.2f}, ממוצע 3 חודשים ${avg_5m:.2f}, שיא 3 חודשים ${high_5m:.2f}.",
         "lastClose5m": round(last_close, 2),
     }
 
@@ -610,9 +610,9 @@ def five_month_history_range(hist: pd.DataFrame) -> tuple[float, float, float]:
 
     try:
         latest_date = hist.index.max()
-        recent = hist.loc[hist.index >= latest_date - pd.DateOffset(months=5)]
+        recent = hist.loc[hist.index >= latest_date - pd.DateOffset(months=3)]
     except Exception:
-        recent = hist.tail(110)
+        recent = hist.tail(66)
 
     lows = recent["Low"].dropna()
     highs = recent["High"].dropna()
@@ -928,7 +928,7 @@ def reason_text(
     if news_signal.get("negative"):
         return f"לא כדאי עכשיו: החדשות כוללות סיכון שלילי ({news_signal.get('summary')})."
     if not five_month_opportunity:
-        return f"לא כדאי עכשיו: המניה לא קרובה מספיק לשפל 5 חודשים ({near_low_5m:.1f}% מעל השפל) ולא לפחות 15% מתחת לשיא 5 חודשים ({below_high_5m:.1f}%)."
+        return f"לא כדאי עכשיו: המניה לא קרובה מספיק לשפל 3 חודשים ({near_low_5m:.1f}% מעל השפל) ולא לפחות 15% מתחת לשיא 3 חודשים ({below_high_5m:.1f}%)."
     if not news_signal.get("positive"):
         return "לא נמצא קטליזטור חיובי ממשי לפי החדשות האחרונות."
     if distance < 12 and not five_month_opportunity:
@@ -971,12 +971,12 @@ def score_explanation(
         parts.append("לא מספיק רחוקה מהשיא")
 
     if near_low_5m <= 15:
-        parts.append(f"קרובה לשפל 5 חודשים: {near_low_5m:.1f}% מעל השפל")
+        parts.append(f"קרובה לשפל 3 חודשים: {near_low_5m:.1f}% מעל השפל")
     elif below_high_5m >= 15:
-        parts.append(f"{below_high_5m:.1f}% מתחת לשיא 5 חודשים")
+        parts.append(f"{below_high_5m:.1f}% מתחת לשיא 3 חודשים")
     else:
-        parts.append("לא קרובה מספיק לתחתית 5 חודשים")
-    parts.append(f"ציון הזדמנות 5 חודשים {opportunity_score}/100")
+        parts.append("לא קרובה מספיק לתחתית 3 חודשים")
+    parts.append(f"ציון הזדמנות 3 חודשים {opportunity_score}/100")
 
     risk_score = int(technical_risk.get("score") or 0)
     if risk_score >= 65:

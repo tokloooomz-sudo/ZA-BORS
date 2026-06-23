@@ -121,7 +121,7 @@ function renderSignals(rows) {
     <table>
       <thead>
         <tr>
-          <th>+</th><th>סימול</th><th>מחיר</th><th>שפל 5 חודשים</th><th>ממוצע 5 חודשים</th><th>שיא 5 חודשים</th><th>מעל שפל 5</th><th>מתחת לשיא 5</th><th>החלטת יועץ</th><th>ציון</th>
+          <th>+</th><th>סימול</th><th>מחיר</th><th>שפל 3 חודשים</th><th>ממוצע 3 חודשים</th><th>שיא 3 חודשים</th><th>מעל שפל 3</th><th>מתחת לשיא 3</th><th>החלטת יועץ</th><th>ציון</th>
           <th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיכון התרסקות</th><th>חדשה אחרונה</th><th>הסבר ציון</th><th>סיבה</th>
         </tr>
       </thead>
@@ -219,7 +219,7 @@ function renderWatchlist(items) {
   watchlistEl.innerHTML = `
     <table>
       <thead>
-        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>עודכן</th><th>שפל 5 חודשים</th><th>ממוצע 5 חודשים</th><th>שיא 5 חודשים</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>קנייה כדאי מינימום</th><th>יציאה כדאי מקסימום</th><th>מצב יעד</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
+        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>עודכן</th><th>שפל 3 חודשים</th><th>ממוצע 3 חודשים</th><th>שיא 3 חודשים</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>קנייה כדאי מינימום</th><th>יציאה כדאי מקסימום</th><th>מצב יעד</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
       </thead>
       <tbody>
       ${items.map(item => {
