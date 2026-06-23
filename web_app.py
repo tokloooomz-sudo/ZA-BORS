@@ -412,6 +412,7 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
     change_pct = (change / previous_close) * 100 if previous_close else 0
     high_52 = first_number(info.get("fiftyTwoWeekHigh"), fast.get("year_high"), close.max() if len(close) else 0)
     low_5m, high_5m, avg_5m = five_month_history_range(hist)
+    sparkline = three_month_sparkline(hist)
     distance = ((high_52 - price) / high_52) * 100 if high_52 else 0
     below_high_5m = ((high_5m - price) / high_5m) * 100 if high_5m else 0
     near_low_5m = ((price - low_5m) / low_5m) * 100 if low_5m else 999
@@ -444,6 +445,7 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
         "low5m": low_5m,
         "high5m": high_5m,
         "avg5m": avg_5m,
+        "sparkline": sparkline,
         "exchange": exchange or "N/A",
         "marketCap": market_cap,
         "rsi": rsi,
@@ -560,6 +562,7 @@ def five_month_price_plan(stock: yf.Ticker, current_price: float) -> dict[str, A
             "low5m": 0,
             "high5m": 0,
             "avg5m": 0,
+            "sparkline": [],
             "suggestedBuyMin": 0,
             "suggestedExitMax": 0,
             "planNote": "אין מספיק נתוני 3 חודשים.",
@@ -573,6 +576,7 @@ def five_month_price_plan(stock: yf.Ticker, current_price: float) -> dict[str, A
             "low5m": 0,
             "high5m": 0,
             "avg5m": 0,
+            "sparkline": [],
             "suggestedBuyMin": 0,
             "suggestedExitMax": 0,
             "planNote": "אין מספיק נתוני שפל/שיא.",
@@ -597,6 +601,7 @@ def five_month_price_plan(stock: yf.Ticker, current_price: float) -> dict[str, A
         "low5m": round(low_5m, 2),
         "high5m": round(high_5m, 2),
         "avg5m": round(avg_5m, 2),
+        "sparkline": sparkline_points(closes),
         "suggestedBuyMin": round(suggested_buy, 2),
         "suggestedExitMax": round(suggested_exit, 2),
         "planNote": f"שפל 3 חודשים ${low_5m:.2f}, ממוצע 3 חודשים ${avg_5m:.2f}, שיא 3 חודשים ${high_5m:.2f}.",
@@ -620,6 +625,27 @@ def five_month_history_range(hist: pd.DataFrame) -> tuple[float, float, float]:
     if lows.empty or highs.empty or closes.empty:
         return 0.0, 0.0, 0.0
     return round(float(lows.min()), 2), round(float(highs.max()), 2), round(float(closes.mean()), 2)
+
+
+def three_month_sparkline(hist: pd.DataFrame) -> list[float]:
+    if hist.empty or "Close" not in hist:
+        return []
+    try:
+        latest_date = hist.index.max()
+        recent = hist.loc[hist.index >= latest_date - pd.DateOffset(months=3)]
+    except Exception:
+        recent = hist.tail(66)
+    return sparkline_points(recent["Close"].dropna())
+
+
+def sparkline_points(close: pd.Series, max_points: int = 36) -> list[float]:
+    clean = close.dropna()
+    if clean.empty:
+        return []
+    if len(clean) > max_points:
+        step = max(1, len(clean) // max_points)
+        clean = clean.iloc[::step].tail(max_points)
+    return [round(float(value), 2) for value in clean.tolist()]
 
 
 def item_alerts(row: dict[str, Any], quote: dict[str, Any]) -> list[str]:

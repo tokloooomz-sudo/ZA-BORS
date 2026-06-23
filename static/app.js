@@ -122,7 +122,7 @@ function renderSignals(rows) {
       <thead>
         <tr>
           <th>+</th><th>סימול</th><th>מחיר</th><th>שפל 3 חודשים</th><th>ממוצע 3 חודשים</th><th>שיא 3 חודשים</th><th>מעל שפל 3</th><th>מתחת לשיא 3</th><th>החלטת יועץ</th><th>ציון</th>
-          <th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיכון התרסקות</th><th>חדשה אחרונה</th><th>הסבר ציון</th><th>סיבה</th>
+          <th>גרף 3 חודשים</th><th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיכון התרסקות</th><th>חדשה אחרונה</th><th>הסבר ציון</th><th>סיבה</th>
         </tr>
       </thead>
       <tbody>
@@ -138,6 +138,7 @@ function renderSignals(rows) {
             <td>${num(row.belowHigh5mPct)}%</td>
             <td class="${verdictClass(row.verdict)}">${row.verdict}</td>
             <td>${row.score}</td>
+            <td>${sparklineSvg(row.sparkline, row.change)}</td>
             <td>${num(row.rsi)}</td>
             <td>${num(row.distance)}%</td>
             <td>${row.positiveCatalyst ? "כן" : "לא"}</td>
@@ -219,7 +220,7 @@ function renderWatchlist(items) {
   watchlistEl.innerHTML = `
     <table>
       <thead>
-        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>עודכן</th><th>שפל 3 חודשים</th><th>ממוצע 3 חודשים</th><th>שיא 3 חודשים</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>קנייה כדאי מינימום</th><th>יציאה כדאי מקסימום</th><th>מצב יעד</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
+        <tr><th>-</th><th>V</th><th>סימול</th><th>מחיר</th><th>שינוי</th><th>עודכן</th><th>שפל 3 חודשים</th><th>ממוצע 3 חודשים</th><th>שיא 3 חודשים</th><th>גרף 3 חודשים</th><th>מחיר קנייה</th><th>כמה קניתי ($)</th><th>קנייה כדאי מינימום</th><th>יציאה כדאי מקסימום</th><th>מצב יעד</th><th>שמירה</th><th>רווח/הפסד אם מוכר עכשיו</th><th>הערה</th></tr>
       </thead>
       <tbody>
       ${items.map(item => {
@@ -243,6 +244,7 @@ function renderWatchlist(items) {
             <td>${money(q.low5m)}</td>
             <td>${money(q.avg5m)}</td>
             <td>${money(q.high5m)}</td>
+            <td>${sparklineSvg(q.sparkline, q.change)}</td>
             <td><input id="buy-${item.Ticker}" class="buy-price-input" type="number" value="${isOwned ? buyPrice : 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
             <td><input id="invested-${item.Ticker}" class="buy-price-input" type="number" value="${isOwned ? investedAmount : 0}" min="0" step="0.01" inputmode="decimal" placeholder="1000" /></td>
             <td><input id="target-buy-${item.Ticker}" class="buy-price-input" title="${q.planNote || ""}" type="number" value="${targetBuyValue || 0}" min="0" step="0.01" inputmode="decimal" placeholder="0.00" /></td>
@@ -480,6 +482,30 @@ function verdictClass(v) {
   if (v === "כדאי לקנות") return "verdict-strong";
   return "verdict-avoid";
 }
+function sparklineSvg(values, fallbackChange = 0) {
+  const points = (values || []).map(Number).filter(value => Number.isFinite(value) && value > 0);
+  if (points.length < 2) return `<span class="sparkline-empty">-</span>`;
+  const width = 128;
+  const height = 42;
+  const pad = 4;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+  const path = points.map((value, index) => {
+    const x = pad + (index / (points.length - 1)) * (width - pad * 2);
+    const y = height - pad - ((value - min) / range) * (height - pad * 2);
+    return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const trend = points[points.length - 1] - points[0] || Number(fallbackChange || 0);
+  const className = trend >= 0 ? "sparkline-up" : "sparkline-down";
+  return `
+    <svg class="sparkline ${className}" viewBox="0 0 ${width} ${height}" role="img" aria-label="גרף תנועה 3 חודשים">
+      <path class="sparkline-fill" d="${path} L${width - pad},${height - pad} L${pad},${height - pad} Z"></path>
+      <path class="sparkline-line" d="${path}"></path>
+    </svg>
+  `;
+}
+
 function priceClass(change) {
   if (change > 0) return "price-up";
   if (change < 0) return "price-down";
