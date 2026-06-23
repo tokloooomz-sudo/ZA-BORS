@@ -122,7 +122,7 @@ function renderSignals(rows) {
       <thead>
         <tr>
           <th>+</th><th>סימול</th><th>מחיר</th><th>שפל 3 חודשים</th><th>ממוצע 3 חודשים</th><th>שיא 3 חודשים</th><th>מעל שפל 3</th><th>מתחת לשיא 3</th><th>החלטת יועץ</th><th>ציון</th>
-          <th>גרף 3 חודשים</th><th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיכון התרסקות</th><th>חדשה אחרונה</th><th>הסבר ציון</th><th>סיבה</th>
+          <th>גרף 3 חודשים</th><th>סימני עליה</th><th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיכון התרסקות</th><th>חדשה אחרונה</th><th>הסבר ציון</th><th>סיבה</th>
         </tr>
       </thead>
       <tbody>
@@ -139,6 +139,7 @@ function renderSignals(rows) {
             <td class="${verdictClass(row.verdict)}">${row.verdict}</td>
             <td>${row.score}</td>
             <td>${sparklineSvg(row.sparkline, row.change)}</td>
+            <td class="${reboundClass(row.reboundScore)}">${row.reboundScore || 0}/100<br><small>${row.reboundText || ""}</small></td>
             <td>${num(row.rsi)}</td>
             <td>${num(row.distance)}%</td>
             <td>${row.positiveCatalyst ? "כן" : "לא"}</td>
@@ -515,6 +516,11 @@ function riskClass(score) {
   if (Number(score || 0) >= 65) return "price-down";
   if (Number(score || 0) >= 35) return "price-flat";
   return "price-up";
+}
+function reboundClass(score) {
+  if (Number(score || 0) >= 70) return "price-up";
+  if (Number(score || 0) >= 55) return "price-flat";
+  return "price-down";
 }
 function money(value) { return `$${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`; }
 function num(value) { return Number(value || 0).toFixed(2); }

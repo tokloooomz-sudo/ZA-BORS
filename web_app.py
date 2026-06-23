@@ -400,6 +400,7 @@ def scan(req: ScanRequest, _: str = Depends(require_login)) -> JSONResponse:
     rows.sort(
         key=lambda row: (
             verdict_order(row["verdict"]),
+            -row.get("reboundScore", 0),
             -row.get("opportunityScore", 0),
             -row["score"],
             row.get("nearLow5mPct", 999),
@@ -437,14 +438,15 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
     price_in_range = price > 0 and req.min_investment <= price <= req.max_investment
     news_signal = analyze_news(stock.news if hasattr(stock, "news") else [])
     technical_risk = crash_risk(close, price, high_52, change_pct, rsi)
+    rebound_signal = rebound_profile(close, price, high_5m, change_pct, rsi)
     catalyst = news_signal["positive"] and not news_signal["negative"]
     opportunity_score = five_month_opportunity_score(near_low_5m, below_high_5m)
-    score = score_stock(rsi, distance, market_cap, news_signal, technical_risk, price_in_range, opportunity_score)
-    buy_candidate = is_buy_setup(rsi, distance, news_signal, technical_risk, price_in_range, score, five_month_opportunity)
+    score = score_stock(rsi, distance, market_cap, news_signal, technical_risk, price_in_range, opportunity_score, rebound_signal["score"])
+    buy_candidate = is_buy_setup(rsi, distance, news_signal, technical_risk, price_in_range, score, five_month_opportunity, rebound_signal)
     verdict = "כדאי לקנות" if buy_candidate else "לא כדאי עכשיו"
-    if not exchange_ok or not cap_ok or not price_in_range or technical_risk["avoid"]:
+    if not exchange_ok or not cap_ok or not price_in_range or technical_risk["avoid"] or not rebound_signal["confirmed"]:
         verdict = "לא כדאי עכשיו"
-    reason = reason_text(exchange_ok, cap_ok, price_in_range, news_signal, technical_risk, rsi, distance, five_month_opportunity, near_low_5m, below_high_5m)
+    reason = reason_text(exchange_ok, cap_ok, price_in_range, news_signal, technical_risk, rsi, distance, five_month_opportunity, near_low_5m, below_high_5m, rebound_signal)
     return {
         "ticker": ticker,
         "name": name,
@@ -468,11 +470,13 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
         "priceInRange": price_in_range,
         "newsScore": news_signal["score"],
         "riskScore": technical_risk["score"],
+        "reboundScore": rebound_signal["score"],
+        "reboundText": rebound_signal["summary"],
         "catalystText": news_signal["summary"],
         "riskText": technical_risk["summary"],
         "latestNews": news_signal["latest"],
         "reason": reason,
-        "scoreExplanation": score_explanation(rsi, distance, news_signal, technical_risk, price_in_range, near_low_5m, below_high_5m, opportunity_score),
+        "scoreExplanation": score_explanation(rsi, distance, news_signal, technical_risk, price_in_range, near_low_5m, below_high_5m, opportunity_score, rebound_signal),
     }
 
 
@@ -878,6 +882,51 @@ def crash_risk(close: pd.Series, price: float, high_52: float, change_pct: float
     return {"avoid": avoid, "score": risk, "summary": summary}
 
 
+def rebound_profile(close: pd.Series, price: float, high_3m: float, change_pct: float, rsi: float) -> dict[str, Any]:
+    if close.empty or len(close) < 21 or not price:
+        return {"confirmed": False, "score": 0, "summary": "אין מספיק נתונים לאישור התאוששות."}
+
+    latest = float(close.iloc[-1])
+    close_5d = float(close.iloc[-6]) if len(close) >= 6 else latest
+    close_10d = float(close.iloc[-11]) if len(close) >= 11 else latest
+    ma5 = float(close.tail(5).mean())
+    ma10 = float(close.tail(10).mean()) if len(close) >= 10 else ma5
+    low_20d = float(close.tail(20).min())
+    high_drop = ((high_3m - latest) / high_3m) * 100 if high_3m else 0
+    gain_5d = ((latest - close_5d) / close_5d) * 100 if close_5d else 0
+    gain_10d = ((latest - close_10d) / close_10d) * 100 if close_10d else 0
+    bounce_from_low = ((latest - low_20d) / low_20d) * 100 if low_20d else 0
+
+    score = 0
+    reasons = []
+    if high_drop >= 15:
+        score += 25
+        reasons.append(f"נפלה {high_drop:.1f}% מהשיא של 3 חודשים")
+    if gain_5d >= 2:
+        score += 25
+        reasons.append(f"עלתה {gain_5d:.1f}% ב-5 ימים")
+    if gain_10d >= 4:
+        score += 20
+        reasons.append(f"עלתה {gain_10d:.1f}% ב-10 ימים")
+    if latest >= ma5 >= ma10:
+        score += 20
+        reasons.append("המחיר מעל ממוצעים קצרים")
+    if bounce_from_low >= 5:
+        score += 15
+        reasons.append(f"התרחקה {bounce_from_low:.1f}% מהשפל האחרון")
+    if 25 <= rsi <= 55:
+        score += 10
+        reasons.append(f"RSI {rsi:.1f} מתאים להתאוששות")
+    if change_pct <= -4:
+        score -= 25
+        reasons.append("ירידה יומית חדה מדי")
+
+    score = int(max(0, min(100, score)))
+    confirmed = high_drop >= 15 and score >= 55 and gain_5d > 0 and change_pct > -4
+    summary = " | ".join(reasons[:4]) if reasons else "לא זוהו סימני התאוששות."
+    return {"confirmed": confirmed, "score": score, "summary": summary}
+
+
 def is_five_month_opportunity(near_low_5m: float, below_high_5m: float) -> bool:
     return near_low_5m <= 15 or below_high_5m >= 15
 
@@ -896,6 +945,7 @@ def score_stock(
     technical_risk: dict[str, Any],
     price_in_range: bool,
     opportunity_score: int,
+    rebound_score: int,
 ) -> int:
     rsi_score = max(0, min(100, 100 - max(0, rsi - 35) * 2))
     dip_score = max(0, min(100, distance * 3))
@@ -906,6 +956,7 @@ def score_stock(
         rsi_score * 0.2
         + dip_score * 0.25
         + opportunity_score * 0.25
+        + rebound_score * 0.25
         + cap_score * 0.1
         + max(-35, min(35, news_score))
         - risk_score * 0.45
@@ -922,18 +973,22 @@ def is_buy_setup(
     price_in_range: bool,
     score: int,
     five_month_opportunity: bool,
+    rebound_signal: dict[str, Any],
 ) -> bool:
     if not price_in_range or technical_risk.get("avoid"):
         return False
     if not five_month_opportunity:
         return False
+    if not rebound_signal.get("confirmed"):
+        return False
     if rsi > 48:
         return False
 
-    rebound_signal = news_signal.get("positive") and not news_signal.get("negative")
+    positive_news = news_signal.get("positive") and not news_signal.get("negative")
     deep_value_pullback = distance >= 25 and rsi <= 42 and int(technical_risk.get("score") or 0) < 50
-    solid_buy_score = score >= 72 and distance >= 15 and rsi <= 45
-    return bool(rebound_signal or deep_value_pullback or solid_buy_score)
+    recovery_score = int(rebound_signal.get("score") or 0)
+    solid_buy_score = score >= 72 and distance >= 15 and rsi <= 45 and recovery_score >= 55
+    return bool((positive_news and recovery_score >= 55) or deep_value_pullback or solid_buy_score)
 
 
 def is_buy_candidate(row: dict[str, Any]) -> bool:
@@ -951,6 +1006,7 @@ def reason_text(
     five_month_opportunity: bool,
     near_low_5m: float,
     below_high_5m: float,
+    rebound_signal: dict[str, Any],
 ) -> str:
     if not exchange_ok:
         return "לא נסחרת בבורסה מתאימה."
@@ -964,6 +1020,8 @@ def reason_text(
         return f"לא כדאי עכשיו: החדשות כוללות סיכון שלילי ({news_signal.get('summary')})."
     if not five_month_opportunity:
         return f"לא כדאי עכשיו: המניה לא קרובה מספיק לשפל 3 חודשים ({near_low_5m:.1f}% מעל השפל) ולא לפחות 15% מתחת לשיא 3 חודשים ({below_high_5m:.1f}%)."
+    if not rebound_signal.get("confirmed"):
+        return f"לא כדאי עכשיו: המניה ירדה, אבל עדיין אין מספיק סימני התאוששות לכניסה ({rebound_signal.get('summary')})."
     if not news_signal.get("positive"):
         return "לא נמצא קטליזטור חיובי ממשי לפי החדשות האחרונות."
     if distance < 12 and not five_month_opportunity:
@@ -984,6 +1042,7 @@ def score_explanation(
     near_low_5m: float,
     below_high_5m: float,
     opportunity_score: int,
+    rebound_signal: dict[str, Any],
 ) -> str:
     parts = []
     if news_signal.get("positive") and not news_signal.get("negative"):
@@ -1012,6 +1071,7 @@ def score_explanation(
     else:
         parts.append("לא קרובה מספיק לתחתית 3 חודשים")
     parts.append(f"ציון הזדמנות 3 חודשים {opportunity_score}/100")
+    parts.append(f"סימני התאוששות {int(rebound_signal.get('score') or 0)}/100: {rebound_signal.get('summary')}")
 
     risk_score = int(technical_risk.get("score") or 0)
     if risk_score >= 65:
