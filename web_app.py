@@ -180,19 +180,28 @@ def require_login(request: Request) -> str:
 @app.get("/", response_class=HTMLResponse)
 def login_home():
     template = templates.get_template("login.html")
-    return template.render(app_name="ZA-BORS", error="")
+    return HTMLResponse(
+        template.render(app_name="ZA-BORS", error=""),
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @app.get("/app", response_class=HTMLResponse)
 def app_home():
     template = templates.get_template("index.html")
-    return template.render(app_name="ZA-BORS")
+    return HTMLResponse(
+        template.render(app_name="ZA-BORS"),
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page():
     template = templates.get_template("login.html")
-    return template.render(app_name="ZA-BORS", error="")
+    return HTMLResponse(
+        template.render(app_name="ZA-BORS", error=""),
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @app.post("/api/login")
