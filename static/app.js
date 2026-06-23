@@ -121,7 +121,7 @@ function renderSignals(rows) {
     <table>
       <thead>
         <tr>
-          <th>+</th><th>סימול</th><th>מחיר</th><th>שפל 5 חודשים</th><th>ממוצע 5 חודשים</th><th>שיא 5 חודשים</th><th>החלטת יועץ</th><th>ציון</th>
+          <th>+</th><th>סימול</th><th>מחיר</th><th>שפל 5 חודשים</th><th>ממוצע 5 חודשים</th><th>שיא 5 חודשים</th><th>מעל שפל 5</th><th>מתחת לשיא 5</th><th>החלטת יועץ</th><th>ציון</th>
           <th>RSI</th><th>מרחק משיא</th><th>קטליזטור</th><th>סיכון התרסקות</th><th>חדשה אחרונה</th><th>הסבר ציון</th><th>סיבה</th>
         </tr>
       </thead>
@@ -134,6 +134,8 @@ function renderSignals(rows) {
             <td>${money(row.low5m)}</td>
             <td>${money(row.avg5m)}</td>
             <td>${money(row.high5m)}</td>
+            <td>${num(row.nearLow5mPct)}%</td>
+            <td>${num(row.belowHigh5mPct)}%</td>
             <td class="${verdictClass(row.verdict)}">${row.verdict}</td>
             <td>${row.score}</td>
             <td>${num(row.rsi)}</td>

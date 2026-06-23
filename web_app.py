@@ -388,7 +388,15 @@ def scan(req: ScanRequest, _: str = Depends(require_login)) -> JSONResponse:
                 rows.append(row)
         except Exception as exc:
             continue
-    rows.sort(key=lambda row: (verdict_order(row["verdict"]), not row.get("isLeveraged"), -row["score"]))
+    rows.sort(
+        key=lambda row: (
+            verdict_order(row["verdict"]),
+            -row.get("opportunityScore", 0),
+            -row["score"],
+            row.get("nearLow5mPct", 999),
+            not row.get("isLeveraged"),
+        )
+    )
     return JSONResponse({"rows": rows, "scanned": len(universe_df)})
 
 
@@ -405,6 +413,9 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
     high_52 = first_number(info.get("fiftyTwoWeekHigh"), fast.get("year_high"), close.max() if len(close) else 0)
     low_5m, high_5m, avg_5m = five_month_history_range(hist)
     distance = ((high_52 - price) / high_52) * 100 if high_52 else 0
+    below_high_5m = ((high_5m - price) / high_5m) * 100 if high_5m else 0
+    near_low_5m = ((price - low_5m) / low_5m) * 100 if low_5m else 999
+    five_month_opportunity = is_five_month_opportunity(near_low_5m, below_high_5m)
     rsi = compute_rsi(close)
     market_cap = first_number(info.get("marketCap"))
     exchange = str(info.get("exchange") or info.get("fullExchangeName") or "")
@@ -417,12 +428,13 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
     news_signal = analyze_news(stock.news if hasattr(stock, "news") else [])
     technical_risk = crash_risk(close, price, high_52, change_pct, rsi)
     catalyst = news_signal["positive"] and not news_signal["negative"]
-    score = score_stock(rsi, distance, market_cap, news_signal, technical_risk, price_in_range)
-    buy_candidate = is_buy_setup(rsi, distance, news_signal, technical_risk, price_in_range, score)
+    opportunity_score = five_month_opportunity_score(near_low_5m, below_high_5m)
+    score = score_stock(rsi, distance, market_cap, news_signal, technical_risk, price_in_range, opportunity_score)
+    buy_candidate = is_buy_setup(rsi, distance, news_signal, technical_risk, price_in_range, score, five_month_opportunity)
     verdict = "כדאי לקנות" if buy_candidate else "לא כדאי עכשיו"
     if not exchange_ok or not cap_ok or not price_in_range or technical_risk["avoid"]:
         verdict = "לא כדאי עכשיו"
-    reason = reason_text(exchange_ok, cap_ok, price_in_range, news_signal, technical_risk, rsi, distance)
+    reason = reason_text(exchange_ok, cap_ok, price_in_range, news_signal, technical_risk, rsi, distance, five_month_opportunity, near_low_5m, below_high_5m)
     return {
         "ticker": ticker,
         "name": name,
@@ -436,6 +448,9 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
         "marketCap": market_cap,
         "rsi": rsi,
         "distance": distance,
+        "nearLow5mPct": near_low_5m,
+        "belowHigh5mPct": below_high_5m,
+        "opportunityScore": opportunity_score,
         "score": score,
         "verdict": verdict,
         "positiveCatalyst": catalyst,
@@ -446,7 +461,7 @@ def scan_one(ticker: str, req: ScanRequest) -> dict[str, Any]:
         "riskText": technical_risk["summary"],
         "latestNews": news_signal["latest"],
         "reason": reason,
-        "scoreExplanation": score_explanation(rsi, distance, news_signal, technical_risk, price_in_range),
+        "scoreExplanation": score_explanation(rsi, distance, news_signal, technical_risk, price_in_range, near_low_5m, below_high_5m, opportunity_score),
     }
 
 
@@ -828,7 +843,25 @@ def crash_risk(close: pd.Series, price: float, high_52: float, change_pct: float
     return {"avoid": avoid, "score": risk, "summary": summary}
 
 
-def score_stock(rsi: float, distance: float, market_cap: float, news_signal: dict[str, Any], technical_risk: dict[str, Any], price_in_range: bool) -> int:
+def is_five_month_opportunity(near_low_5m: float, below_high_5m: float) -> bool:
+    return near_low_5m <= 15 or below_high_5m >= 15
+
+
+def five_month_opportunity_score(near_low_5m: float, below_high_5m: float) -> int:
+    near_low_score = max(0, min(100, 100 - max(0, near_low_5m) * 4))
+    below_high_score = max(0, min(100, below_high_5m * 4))
+    return int(max(near_low_score, below_high_score))
+
+
+def score_stock(
+    rsi: float,
+    distance: float,
+    market_cap: float,
+    news_signal: dict[str, Any],
+    technical_risk: dict[str, Any],
+    price_in_range: bool,
+    opportunity_score: int,
+) -> int:
     rsi_score = max(0, min(100, 100 - max(0, rsi - 35) * 2))
     dip_score = max(0, min(100, distance * 3))
     cap_score = max(0, min(100, market_cap / 1_000_000_000 * 10))
@@ -837,6 +870,7 @@ def score_stock(rsi: float, distance: float, market_cap: float, news_signal: dic
     score = (
         rsi_score * 0.2
         + dip_score * 0.25
+        + opportunity_score * 0.25
         + cap_score * 0.1
         + max(-35, min(35, news_score))
         - risk_score * 0.45
@@ -845,10 +879,18 @@ def score_stock(rsi: float, distance: float, market_cap: float, news_signal: dic
     return int(max(0, min(100, round(score))))
 
 
-def is_buy_setup(rsi: float, distance: float, news_signal: dict[str, Any], technical_risk: dict[str, Any], price_in_range: bool, score: int) -> bool:
+def is_buy_setup(
+    rsi: float,
+    distance: float,
+    news_signal: dict[str, Any],
+    technical_risk: dict[str, Any],
+    price_in_range: bool,
+    score: int,
+    five_month_opportunity: bool,
+) -> bool:
     if not price_in_range or technical_risk.get("avoid"):
         return False
-    if distance < 12:
+    if not five_month_opportunity:
         return False
     if rsi > 48:
         return False
@@ -863,7 +905,18 @@ def is_buy_candidate(row: dict[str, Any]) -> bool:
     return row.get("verdict") == "כדאי לקנות"
 
 
-def reason_text(exchange_ok: bool, cap_ok: bool, price_in_range: bool, news_signal: dict[str, Any], technical_risk: dict[str, Any], rsi: float, distance: float) -> str:
+def reason_text(
+    exchange_ok: bool,
+    cap_ok: bool,
+    price_in_range: bool,
+    news_signal: dict[str, Any],
+    technical_risk: dict[str, Any],
+    rsi: float,
+    distance: float,
+    five_month_opportunity: bool,
+    near_low_5m: float,
+    below_high_5m: float,
+) -> str:
     if not exchange_ok:
         return "לא נסחרת בבורסה מתאימה."
     if not cap_ok:
@@ -874,9 +927,11 @@ def reason_text(exchange_ok: bool, cap_ok: bool, price_in_range: bool, news_sign
         return f"להתרחק כרגע: זוהה סיכון התרסקות ({technical_risk.get('summary')})."
     if news_signal.get("negative"):
         return f"לא כדאי עכשיו: החדשות כוללות סיכון שלילי ({news_signal.get('summary')})."
+    if not five_month_opportunity:
+        return f"לא כדאי עכשיו: המניה לא קרובה מספיק לשפל 5 חודשים ({near_low_5m:.1f}% מעל השפל) ולא לפחות 15% מתחת לשיא 5 חודשים ({below_high_5m:.1f}%)."
     if not news_signal.get("positive"):
         return "לא נמצא קטליזטור חיובי ממשי לפי החדשות האחרונות."
-    if distance < 12:
+    if distance < 12 and not five_month_opportunity:
         return "המחיר לא נמוך מספיק ביחס לשיא/טווח רגיל."
     if rsi > 48:
         return "RSI גבוה יחסית, לא מספיק buy-low."
@@ -885,7 +940,16 @@ def reason_text(exchange_ok: bool, cap_ok: bool, price_in_range: bool, news_sign
     return "כדאי לקנות בזהירות: המחיר נמוך משמעותית ביחס לשיא, בלי סיכון התרסקות גבוה, ועם פוטנציאל חזרה למעלה."
 
 
-def score_explanation(rsi: float, distance: float, news_signal: dict[str, Any], technical_risk: dict[str, Any], price_in_range: bool) -> str:
+def score_explanation(
+    rsi: float,
+    distance: float,
+    news_signal: dict[str, Any],
+    technical_risk: dict[str, Any],
+    price_in_range: bool,
+    near_low_5m: float,
+    below_high_5m: float,
+    opportunity_score: int,
+) -> str:
     parts = []
     if news_signal.get("positive") and not news_signal.get("negative"):
         parts.append("חדשות חיוביות מחזקות את הסיכוי לעלייה")
@@ -905,6 +969,14 @@ def score_explanation(rsi: float, distance: float, news_signal: dict[str, Any], 
         parts.append(f"{distance:.1f}% מתחת לשיא 52 שבועות")
     else:
         parts.append("לא מספיק רחוקה מהשיא")
+
+    if near_low_5m <= 15:
+        parts.append(f"קרובה לשפל 5 חודשים: {near_low_5m:.1f}% מעל השפל")
+    elif below_high_5m >= 15:
+        parts.append(f"{below_high_5m:.1f}% מתחת לשיא 5 חודשים")
+    else:
+        parts.append("לא קרובה מספיק לתחתית 5 חודשים")
+    parts.append(f"ציון הזדמנות 5 חודשים {opportunity_score}/100")
 
     risk_score = int(technical_risk.get("score") or 0)
     if risk_score >= 65:
